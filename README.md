@@ -114,8 +114,7 @@ Each baseline implementation includes:
 - Dropout: 0.1
 
 ## Data Format
-
-The baselines expect preprocessed EEG data in the following format:
+Please use the [IESSEEG-toolbox](https://github.com/roychowdhuryresearch/IESSEEG-toolbox) for preprocessing BIDS format data. The baselines expect post-preprocessed EEG data in the following format:
 - Sampling frequency: 200Hz
 - Preprocessed using scripts from preprocessing_release
 - Metadata in CSV format
