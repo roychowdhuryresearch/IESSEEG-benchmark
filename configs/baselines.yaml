@@ -1,0 +1,91 @@
+# Benchmark configuration for the IESSEEG reference baselines.
+#
+# One place to read (and cite) the protocol: window length, montage,
+# checkpoint, and fine-tuning hyperparameters per model. These values
+# match the runs reported in the paper. The per-model runner scripts in
+# scripts/ read them, so changing a number here changes the experiment
+# rather than only the documentation.
+#
+# For the three foundation models the fine-tuning hyperparameters are the
+# authors' own recommended defaults, deliberately left unchanged: tuning
+# them per task would make the comparison a hyperparameter search rather
+# than an out-of-the-box transfer measurement.
+
+protocol:
+  n_folds: 5
+  sample_rate: 200
+  tasks: [case_control, immediate_responder, meaningful_responder]
+  # At inference each 30-minute Routine Clip is tiled with
+  # non-overlapping windows; window probabilities are averaged into one
+  # clip-level score, then thresholded at 0.5.
+  clip_aggregation: mean_probability
+  decision_threshold: 0.5
+
+models:
+
+  handcrafted:
+    display_name: GBDT + Clinical Prior
+    data_subdir: scalp_eeg_data_200HZ_np_format
+    test_subdir: baseline_test
+    montage: 22-channel longitudinal bipolar
+    window_sec: 30
+    features: [band_power, band_ratios, hjorth_mobility, hjorth_complexity, spectral_entropy]
+    classifier: xgboost
+    notes: XGBoost defaults; features computed per channel then concatenated.
+
+  cnn_resnet:
+    display_name: 3D ResNet-18
+    data_subdir: scalp_eeg_data_200HZ_np_format
+    test_subdir: baseline_test
+    montage: 22-channel longitudinal bipolar
+    window_sec: 30
+    input: morlet time-frequency cube
+    max_epochs: 100
+
+  cnn_vit:
+    display_name: 3D ViT
+    data_subdir: scalp_eeg_data_200HZ_np_format
+    test_subdir: baseline_test
+    montage: 22-channel longitudinal bipolar
+    window_sec: 30
+    input: morlet time-frequency cube
+    patch_size: [11, 8, 32]
+    max_epochs: 100
+
+  biot:
+    display_name: BIOT
+    data_subdir: scalp_eeg_data_200HZ_np_format_biot
+    test_subdir: biot_test
+    montage: 18-channel longitudinal bipolar (BIOT)
+    checkpoint: EEG-six-datasets-18-channels.ckpt
+    window_sec: 30
+    window_transform: quantile
+    epochs: 50
+    batch_size: 64
+    lr: 3.0e-5
+    num_workers: 8
+
+  labram:
+    display_name: LaBraM
+    data_subdir: scalp_eeg_data_200HZ_np_format_labram
+    test_subdir: labram_test
+    montage: 19-channel TUEG
+    checkpoint: labram-base.pth
+    window_sec: 10
+    window_transform: none
+    epochs: 50
+    warmup_epochs: 5
+    batch_size: 64
+    lr: 5.0e-4
+
+  cbramod:
+    display_name: CBraMod
+    data_subdir: scalp_eeg_data_200HZ_np_format_cbramod
+    test_subdir: cbramod_test
+    montage: 19-channel TUEG
+    checkpoint: pretrained_weights.pth
+    window_sec: 30
+    window_transform: patch
+    epochs: 50
+    batch_size: 64
+    lr: 3.0e-5
