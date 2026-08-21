@@ -110,6 +110,18 @@ and `results/results_summary.csv` (mean/std), and warns when a model × task
 has fewer than five folds, so a partial rerun cannot quietly become a
 headline number.
 
+## Tests
+
+```bash
+pytest tests/
+```
+
+These need neither EEG data nor trained checkpoints. They check the
+protocol invariants on the released manifests (no patient appears on both
+sides of a fold, each subject is held out exactly once, folds are
+stratified), the per-model window transforms, and the metric and
+aggregation behaviour on synthetic runs.
+
 ## Repository layout
 
 ```
@@ -120,6 +132,7 @@ iesseeg/              shared library
 baselines/            one directory per model (upstream code + runners)
 configs/              protocol and per-model hyperparameters
 scripts/              entry points; lib/common.sh holds shared shell setup
+tests/                protocol invariants and library behaviour
 splits/               released fold manifests -- the fixed evaluation protocol
 ```
 
