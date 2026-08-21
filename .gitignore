@@ -192,3 +192,6 @@ results/
 feature_cache/
 pretrained-models/
 pretrained_weights/
+
+# Patient-derived analysis outputs
+analysis/based/results/
