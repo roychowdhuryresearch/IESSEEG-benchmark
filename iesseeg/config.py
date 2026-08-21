@@ -53,6 +53,9 @@ MODEL_DATA_SUBDIR = {
     # EEGPT wants a referential 10-20 montage, which is the tree the
     # TUEG-style models already use.
     "eegpt": "scalp_eeg_data_200HZ_np_format_labram",
+    # REVE is trained at 200 Hz, our native rate, and takes electrode
+    # positions explicitly, so it consumes the referential tree as-is.
+    "reve": "scalp_eeg_data_200HZ_np_format_labram",
 }
 
 # Which baselines/ directory holds each model's runner scripts. Two
@@ -67,6 +70,7 @@ MODEL_BASELINE_DIR = {
     "cbramod": "cbramod",
     "luna": "luna",
     "eegpt": "eegpt",
+    "reve": "reve",
 }
 
 MODEL_TEST_SUBDIR = {
@@ -78,6 +82,7 @@ MODEL_TEST_SUBDIR = {
     "cbramod": "cbramod_test",
     "luna": "baseline_test",
     "eegpt": "labram_test",
+    "reve": "labram_test",
 }
 
 N_FOLDS = 5
