@@ -15,11 +15,11 @@ gets a horizontal median reference, so the vertical gap between the two
 lines is the effect that exists and their flatness is the effect that
 does not.
 
-Encoding follows the project's visualization rules. Treatment condition
-is nominal with two levels, so it takes categorical slots 1 and 2 (blue,
-orange; validated at protanopia dE 24.7). The BASED score is ordinal
-0-5, so it takes a single-hue sequential ramp light-to-dark, not a
-rainbow map, which would hide the very ordering it is meant to show.
+Encoding: treatment condition is nominal with two levels and carries the
+finding in both rows, so it takes categorical slots 1 and 2 throughout
+(blue, orange; validated at protanopia dE 24.7). BASED is on the x-axis
+of both rows rather than in the colour channel, which keeps one
+consistent legend for the whole figure.
 """
 
 import os
@@ -29,7 +29,6 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from matplotlib.colors import BoundaryNorm, ListedColormap
 from matplotlib.lines import Line2D
 from scipy import stats
 from sklearn.linear_model import RidgeCV
@@ -42,8 +41,6 @@ RESULTS = "results"
 
 # Categorical slots 1 and 2, for the two treatment conditions.
 PRE_HUE, POST_HUE = "#2a78d6", "#eb6834"
-# Single-hue sequential ramp, one step per BASED level 0-5.
-BASED_RAMP = ["#b7d3f6", "#86b6ef", "#5598e7", "#2a78d6", "#1c5cab", "#104281"]
 
 SURFACE = "#fcfcfb"
 INK, INK_2, MUTED = "#0b0b0b", "#52514e", "#898781"
@@ -69,6 +66,24 @@ def style(ax):
         ax.spines[side].set_color(AXIS)
 
 
+def probe_predictions(emb_by_uid, rows, n_splits=5):
+    """Out-of-fold ridge predictions of BASED from the embedding.
+
+    Grouped by recording, so a recording's seven rater epochs never span
+    the train/test boundary; without that the probe scores itself on
+    near-duplicates and looks far better than it is.
+    """
+    X = np.stack([emb_by_uid[u] for u in rows.segment_uid])
+    y = rows.based.values.astype(float)
+    groups = rows.recording_id.values
+    pred = np.zeros_like(y, dtype=float)
+    for tr, te in GroupKFold(n_splits=min(n_splits, len(np.unique(groups)))).split(X, y, groups):
+        sc = StandardScaler().fit(X[tr])
+        rg = RidgeCV(alphas=np.logspace(-2, 5, 30)).fit(sc.transform(X[tr]), y[tr])
+        pred[te] = rg.predict(sc.transform(X[te]))
+    return pred, y, rows.cond.values
+
+
 def probe(emb_by_uid, rows, n_splits=5):
     """Ridge from embedding to BASED, grouped by recording."""
     X = np.stack([emb_by_uid[u] for u in rows.segment_uid])
@@ -92,8 +107,8 @@ def main():
     cond = pd.read_csv(META).drop_duplicates("long_recording_id") \
              .set_index("long_recording_id")["pre_post_treatment_label"]
 
-    fig, axes = plt.subplots(2, 3, figsize=(11.2, 6.8))
-    summary, colour_scale = [], None
+    fig, axes = plt.subplots(2, 3, figsize=(10.6, 6.8))
+    summary = []
 
     for col, (key, label) in enumerate(MODELS):
         scores = pd.read_csv(os.path.join(RESULTS, f"{key}_scores.csv"))
@@ -139,29 +154,36 @@ def main():
         ax.set_ylim(-0.04, 1.04)
 
         # ---------------- B: representation level ----------------
+        # A PCA scatter coloured by BASED was tried first and dropped: it
+        # only shows severity if PC1/PC2 happen to align with it, and a
+        # one-hue ordinal ramp over six levels reads as an undifferentiated
+        # wash. Plotting the probe's own predictions against the truth
+        # answers the question directly -- if the embedding encoded BASED
+        # the points would follow the diagonal -- and colouring by
+        # condition shows what the probe is actually keying on.
         ax = axes[1, col]
         style(ax)
-        uids = scores.drop_duplicates("segment_uid")
-        X = np.stack([emb_by_uid[u] for u in uids.segment_uid])
-        Xz = (X - X.mean(0)) / (X.std(0) + 1e-8)
-        Xz = Xz - Xz.mean(0)
-        U, S, _ = np.linalg.svd(Xz, full_matrices=False)
-        pcs = U[:, :2] * S[:2]
-        var = (S ** 2 / (S ** 2).sum())[:2] * 100
+        pred, y, cond_of = probe_predictions(emb_by_uid, scores)
 
-        vals = scores.groupby("segment_uid").based.mean().loc[uids.segment_uid].values
-        cmap = ListedColormap(BASED_RAMP)
-        norm = BoundaryNorm(np.arange(-0.5, 6.5, 1), cmap.N)
-        colour_scale = ax.scatter(pcs[:, 0], pcs[:, 1], c=vals, cmap=cmap, norm=norm,
-                                  s=34, alpha=0.92, linewidths=0.9,
-                                  edgecolors=SURFACE, zorder=3)
+        lo, hi = -0.4, 5.4
+        ax.plot([lo, hi], [lo, hi], color=AXIS, linewidth=1.0, zorder=1)
+        rng2 = np.random.default_rng(11)
+        for c, hue in (("PRE", PRE_HUE), ("POST", POST_HUE)):
+            sel = cond_of == c
+            jitter = (rng2.random(sel.sum()) - 0.5) * 0.30
+            ax.scatter(y[sel] + jitter, pred[sel], s=30, c=hue, alpha=0.75,
+                       linewidths=0.9, edgecolors=SURFACE, zorder=3)
 
-        probe_rho, _ = probe(emb_by_uid, scores)
-        ax.text(0.5, 1.012, f"embedding probe ρ={probe_rho:+.2f}",
+        probe_rho = stats.spearmanr(pred, y).statistic
+        ss_res = ((y - pred) ** 2).sum(); ss_tot = ((y - y.mean()) ** 2).sum()
+        ax.text(0.5, 1.012,
+                f"probe ρ={probe_rho:+.2f}   ·   R²={1 - ss_res / ss_tot:+.2f}",
                 transform=ax.transAxes, ha="center", va="bottom",
                 fontsize=7.6, color=INK_2)
-        ax.set_xlabel(f"PC1 ({var[0]:.0f}% var.)", color=INK_2)
-        ax.set_ylabel(f"PC2 ({var[1]:.0f}% var.)" if col == 0 else "", color=INK_2)
+        ax.set_xlabel("expert BASED score", color=INK_2)
+        if col == 0:
+            ax.set_ylabel("BASED predicted\nfrom embedding", color=INK_2)
+        ax.set_xticks(range(6)); ax.set_xlim(lo, hi); ax.set_ylim(lo, hi)
 
         summary.append(dict(
             model=label, n=len(scores),
@@ -170,7 +192,7 @@ def main():
             rho_post=strat["POST"].statistic, p_post=strat["POST"].pvalue,
             prob_pre=scores[scores.cond == "PRE"].mean_prob.mean(),
             prob_post=scores[scores.cond == "POST"].mean_prob.mean(),
-            probe_rho_pooled=probe_rho,
+            probe_rho_pooled=probe(emb_by_uid, scores)[0],
             probe_rho_pre=probe(emb_by_uid, scores[scores.cond == "PRE"])[0],
         ))
 
@@ -193,17 +215,11 @@ def main():
     for text in leg.get_texts():
         text.set_color(INK_2)
 
-    fig.tight_layout(rect=[0.02, 0.0, 0.9, 0.935])
-
-    cax = fig.add_axes([0.925, 0.10, 0.013, 0.32])
-    cb = fig.colorbar(colour_scale, cax=cax, ticks=range(6))
-    cb.set_label("expert BASED score", fontsize=8, color=INK_2)
-    cb.ax.tick_params(labelsize=7.5, color=MUTED, labelcolor=MUTED)
-    cb.outline.set_edgecolor(GRID)
+    fig.tight_layout(rect=[0.02, 0.0, 1.0, 0.935])
 
     fig.text(0.012, 0.925, "A", fontsize=12, fontweight="bold", color=INK)
     fig.text(0.012, 0.455, "B", fontsize=12, fontweight="bold", color=INK)
-    fig.text(0.46, 0.972,
+    fig.text(0.54, 0.972,
              "Case probability tracks treatment condition, not BASED severity",
              ha="center", fontsize=11.5, color=INK, fontweight="bold")
 
