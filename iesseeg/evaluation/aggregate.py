@@ -32,6 +32,7 @@ MODEL_RESULT_SUBDIR = {
     "labram": "labram/result/inference",
     "cbramod": "cbramod/result/inference",
     "luna": "luna/result/inference",
+    "eegpt": "eegpt/result/inference",
 }
 
 MODEL_DISPLAY = {
@@ -42,11 +43,12 @@ MODEL_DISPLAY = {
     "labram": "LaBraM",
     "cbramod": "CBraMod",
     "luna": "LUNA",
+    "eegpt": "EEGPT",
 }
 
 # Row order used in the paper's tables: interpretable baselines first,
 # then from-scratch deep models, then pre-trained foundation models.
-MODEL_ORDER = ["handcrafted", "cnn_resnet", "cnn_vit", "biot", "labram", "cbramod", "luna"]
+MODEL_ORDER = ["handcrafted", "cnn_resnet", "cnn_vit", "biot", "labram", "cbramod", "luna", "eegpt"]
 
 TABLE_SPECS = {
     "case_control": dict(

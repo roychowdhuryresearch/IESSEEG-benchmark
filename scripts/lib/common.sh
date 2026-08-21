@@ -77,7 +77,7 @@ model_data_dir () {  # model -> preprocessed training tree
   case "$1" in
     handcrafted|cnn_resnet|cnn_vit|luna) subdir="scalp_eeg_data_200HZ_np_format" ;;
     biot)                           subdir="scalp_eeg_data_200HZ_np_format_biot" ;;
-    labram)                         subdir="scalp_eeg_data_200HZ_np_format_labram" ;;
+    labram|eegpt)                   subdir="scalp_eeg_data_200HZ_np_format_labram" ;;
     cbramod)                        subdir="scalp_eeg_data_200HZ_np_format_cbramod" ;;
     *) echo "model_data_dir: unknown model '$1'" >&2; return 1 ;;
   esac
@@ -89,7 +89,7 @@ model_test_dir () {  # model -> Routine-Clip evaluation tree
   case "$1" in
     handcrafted|cnn_resnet|cnn_vit|luna) subdir="baseline_test" ;;
     biot)                           subdir="biot_test" ;;
-    labram)                         subdir="labram_test" ;;
+    labram|eegpt)                   subdir="labram_test" ;;
     cbramod)                        subdir="cbramod_test" ;;
     *) echo "model_test_dir: unknown model '$1'" >&2; return 1 ;;
   esac

@@ -48,6 +48,7 @@ deviation over the five folds.
 | `labram` | LaBraM | 19-ch TUEG | 10 s | [official checkpoint](https://github.com/935963004/LaBraM) |
 | `cbramod` | CBraMod | 19-ch TUEG | 30 s | [official checkpoint](https://github.com/wjq-learning/CBraMod) |
 | `luna` | LUNA-Base | 22-ch TCP bipolar | 30 s | [official checkpoint](https://huggingface.co/PulpBio/LUNA) |
+| `eegpt` | EEGPT | 19-ch referential | 4 s | [braindecode mirror](https://huggingface.co/braindecode/eegpt-pretrained) |
 
 Foundation models are fine-tuned with their authors' recommended
 hyperparameters (see [`configs/baselines.yaml`](configs/baselines.yaml)),
@@ -84,6 +85,13 @@ LUNA's weights are released under CC BY-ND 4.0, which permits fine-tuning
 for internal use but not redistribution of the fine-tuned weights. This
 repository ships no checkpoints, so running the benchmark stays within
 that licence; do not publish the checkpoints it produces.
+
+EEGPT needs a newer braindecode than the rest of the benchmark pins, so it
+runs from its own interpreter rather than forcing an upgrade that would
+change the environment every other baseline was measured in. See
+[`baselines/eegpt/README.md`](baselines/eegpt/README.md); set
+`IESSEEG_PYTHON_EEGPT` to that interpreter, or skip the model with
+`MODELS="..."`.
 
 ## Running
 

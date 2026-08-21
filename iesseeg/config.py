@@ -50,6 +50,9 @@ MODEL_DATA_SUBDIR = {
     # baselines; its montage reordering and 200->256 Hz resampling happen
     # at load time rather than in a separate preprocessing pass.
     "luna": "scalp_eeg_data_200HZ_np_format",
+    # EEGPT wants a referential 10-20 montage, which is the tree the
+    # TUEG-style models already use.
+    "eegpt": "scalp_eeg_data_200HZ_np_format_labram",
 }
 
 # Which baselines/ directory holds each model's runner scripts. Two
@@ -63,6 +66,7 @@ MODEL_BASELINE_DIR = {
     "labram": "labram",
     "cbramod": "cbramod",
     "luna": "luna",
+    "eegpt": "eegpt",
 }
 
 MODEL_TEST_SUBDIR = {
@@ -73,6 +77,7 @@ MODEL_TEST_SUBDIR = {
     "labram": "labram_test",
     "cbramod": "cbramod_test",
     "luna": "baseline_test",
+    "eegpt": "labram_test",
 }
 
 N_FOLDS = 5

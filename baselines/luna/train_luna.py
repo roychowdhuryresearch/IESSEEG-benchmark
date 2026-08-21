@@ -31,6 +31,10 @@ sys.path.insert(
 
 from iesseeg.data.raw_dataset import InMemoryRandomDataset
 from iesseeg.data.splits import encode_labels
+from iesseeg.training import (
+    CosineWithWarmup, EarlyStopping, clip_level_scores, layer_decay_param_groups,
+    patient_level_split,
+)
 from luna_data import (
     LUNA_SAMPLE_RATE, TCP_MONTAGE, channel_locations, make_recording_transform,
 )
@@ -60,14 +64,8 @@ def build_model(checkpoint, num_classes=2, device="cuda:0"):
 
 
 def param_groups_with_layer_decay(model, base_lr, weight_decay, decay=0.75):
-    """Layer-wise learning-rate decay, as the upstream recipe uses.
-
-    Layers closest to the input keep the most of their pre-trained
-    behaviour and get the smallest learning rate; the new head trains at
-    the full rate.
-    """
-    n_blocks = len(model.blocks)
-    n_layers = n_blocks + 2  # stem, blocks..., head
+    """Layer-wise learning-rate decay over LUNA's stem, blocks and head."""
+    n_layers = len(model.blocks) + 2
 
     def layer_of(name):
         if name.startswith(("patch_embed", "freq_embed", "channel_location_embedder",
@@ -77,22 +75,9 @@ def param_groups_with_layer_decay(model, base_lr, weight_decay, decay=0.75):
             return int(name.split(".")[1]) + 1
         return n_layers - 1  # norm and classifier
 
-    groups = {}
-    for name, param in model.named_parameters():
-        if not param.requires_grad:
-            continue
-        layer = layer_of(name)
-        # Biases and norms are conventionally left out of weight decay.
-        no_decay = param.ndim <= 1
-        key = (layer, no_decay)
-        if key not in groups:
-            groups[key] = {
-                "params": [],
-                "lr": base_lr * (decay ** (n_layers - 1 - layer)),
-                "weight_decay": 0.0 if no_decay else weight_decay,
-            }
-        groups[key]["params"].append(param)
-    return list(groups.values())
+    return layer_decay_param_groups(
+        model, layer_of, n_layers, base_lr, weight_decay, decay
+    )
 
 
 def make_loaders(args, device):
@@ -102,21 +87,9 @@ def make_loaders(args, device):
     recording_col = [c for c in df.columns if "recording_id" in c][0]
     info = list(zip(df["patient_id"], df[recording_col].astype(str), df["label"]))
 
-    # Split by patient, not by clip: clips from one infant are far more
-    # similar to each other than to another infant's, so a random clip
-    # split would leak and inflate validation scores.
-    patients = sorted({p for p, _, _ in info})
-    patient_label = {p: max(l for q, _, l in info if q == p) for p in patients}
-    stratify = [patient_label[p] for p in patients]
-    train_patients, val_patients = train_test_split(
-        patients, test_size=args.val_size, random_state=args.seed,
-        stratify=stratify if len(set(stratify)) > 1 else None,
-    )
-    train_patients, val_patients = set(train_patients), set(val_patients)
-
-    train_info = [t for t in info if t[0] in train_patients]
-    val_info = [t for t in info if t[0] in val_patients]
-    print(f"[DATA] {len(train_patients)} train / {len(val_patients)} val patients; "
+    train_info, val_info = patient_level_split(info, args.val_size, args.seed)
+    print(f"[DATA] {len({p for p,_,_ in train_info})} train / "
+          f"{len({p for p,_,_ in val_info})} val patients; "
           f"{len(train_info)} / {len(val_info)} clips")
 
     common = dict(
@@ -201,23 +174,6 @@ def run_epoch(model, loader, locations, criterion, device, optimizer=None, sched
     return result
 
 
-def clip_level_scores(result):
-    """Average window probabilities within a clip, as at inference."""
-    df = pd.DataFrame({
-        "patient_id": result["patient_id"],
-        "recording_id": result["recording_id"],
-        "pred_prob": result["prob"],
-        "known_label": result["label"],
-    })
-    clip = df.groupby("recording_id").agg(
-        patient_id=("patient_id", "first"),
-        pred_prob=("pred_prob", "mean"),
-        known_label=("known_label", "first"),
-    ).reset_index()
-    clip["pred_label"] = (clip["pred_prob"] >= 0.5).astype(int)
-    return clip
-
-
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--train_csv", required=True)
@@ -292,7 +248,8 @@ def main():
                                  device, optimizer, scheduler)
         val_result = run_epoch(model, loaders["val"], locations, criterion, device)
 
-        clip = clip_level_scores(val_result)
+        clip = clip_level_scores(val_result["patient_id"], val_result["recording_id"],
+                                 val_result["prob"], val_result["label"])
         val_acc = (balanced_accuracy_score(clip["known_label"], clip["pred_label"])
                    if clip["known_label"].nunique() > 1 else float("nan"))
         val_auc = (roc_auc_score(clip["known_label"], clip["pred_prob"])

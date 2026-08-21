@@ -115,3 +115,29 @@ models:
     val_step_sec: 120
     weights_license: CC BY-ND 4.0 (fine-tuning permitted, redistribution of
       fine-tuned weights is not)
+
+  eegpt:
+    display_name: EEGPT
+    # EEGPT reuses the 19-channel referential tree; the `-REF` suffix is
+    # stripped and recordings are resampled 200 -> 250 Hz at load time.
+    data_subdir: scalp_eeg_data_200HZ_np_format_labram
+    test_subdir: labram_test
+    montage: 19-channel referential 10-20
+    checkpoint: braindecode/eegpt-pretrained (HuggingFace)
+    sample_rate: 250
+    # 4 s is EEGPT's pre-training context, much shorter than the 30 s the
+    # other baselines use.
+    window_sec: 4
+    standardization: exponential_moving_standardize
+    chan_proj_type: conv1d_constraint
+    epochs: 50
+    batch_size: 64
+    lr: 5.0e-4
+    weight_decay: 5.0e-2
+    layer_decay: 0.75
+    warmup_epochs: 5
+    patience: 8
+    val_step_sec: 120
+    # Needs braindecode >= 1.3, newer than the rest of the benchmark pins,
+    # so it runs from its own interpreter (IESSEEG_PYTHON_EEGPT).
+    separate_environment: true
