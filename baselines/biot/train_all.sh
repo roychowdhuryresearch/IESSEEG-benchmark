@@ -6,7 +6,7 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../../scripts" && pwd)/lib/common.s
 
 STAGE_NAME="BIOT fine-tune"
 MODEL_NAME="BIOT"
-TRAIN_DATA_DIR="${IESSEEG_DATA_ROOT}/scalp_eeg_data_200HZ_np_format_biot"
+TRAIN_DATA_DIR="$(model_data_dir biot)"
 PRETRAIN_PATH="${IESSEEG_PRETRAINED_DIR:-${IESSEEG_REPO_ROOT}/pretrained-models}/EEG-six-datasets-18-channels.ckpt"
 
 EPOCHS=50

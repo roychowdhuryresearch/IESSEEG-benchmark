@@ -5,7 +5,7 @@
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../../scripts" && pwd)/lib/common.sh"
 
 STAGE_NAME="CBraMod fine-tune"
-TRAIN_DATA_DIR="${IESSEEG_DATA_ROOT}/scalp_eeg_data_200HZ_np_format_cbramod"
+TRAIN_DATA_DIR="$(model_data_dir cbramod)"
 FOUNDATION_CKPT="${IESSEEG_PRETRAINED_DIR:-${IESSEEG_REPO_ROOT}/pretrained-models}/pretrained_weights.pth"
 
 if [ ! -f "${FOUNDATION_CKPT}" ]; then

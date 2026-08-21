@@ -3,7 +3,7 @@
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../../scripts" && pwd)/lib/common.sh"
 
 STAGE_NAME="GBDT inference"
-TEST_DATA_DIR="${IESSEEG_DATA_ROOT}/baseline_test"
+TEST_DATA_DIR="$(model_test_dir handcrafted)"
 FEATURE_CACHE="${IESSEEG_FEATURE_CACHE:-$(pwd)/feature_cache/regional}"
 
 handcrafted_inference () {

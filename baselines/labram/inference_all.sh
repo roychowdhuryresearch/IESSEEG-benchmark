@@ -3,7 +3,7 @@
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../../scripts" && pwd)/lib/common.sh"
 
 STAGE_NAME="LaBraM inference"
-TEST_DATA_DIR="${IESSEEG_DATA_ROOT}/labram_test"
+TEST_DATA_DIR="$(model_test_dir labram)"
 
 labram_inference () {
   local task="$1" fold="$2" label_key="$3" gpu="$4"

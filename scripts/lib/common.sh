@@ -69,6 +69,33 @@ split_csv () {  # task fold split -> path
   echo "${IESSEEG_SPLIT_ROOT}/$1/fold_$2/$3.csv"
 }
 
+# Each model consumes its own montage/preprocessing tree. These mirror
+# MODEL_DATA_SUBDIR / MODEL_TEST_SUBDIR in iesseeg/config.py;
+# tests/test_config_consistency.py fails if the two ever disagree.
+model_data_dir () {  # model -> preprocessed training tree
+  local subdir
+  case "$1" in
+    handcrafted|cnn_resnet|cnn_vit) subdir="scalp_eeg_data_200HZ_np_format" ;;
+    biot)                           subdir="scalp_eeg_data_200HZ_np_format_biot" ;;
+    labram)                         subdir="scalp_eeg_data_200HZ_np_format_labram" ;;
+    cbramod)                        subdir="scalp_eeg_data_200HZ_np_format_cbramod" ;;
+    *) echo "model_data_dir: unknown model '$1'" >&2; return 1 ;;
+  esac
+  echo "${IESSEEG_DATA_ROOT}/${subdir}"
+}
+
+model_test_dir () {  # model -> Routine-Clip evaluation tree
+  local subdir
+  case "$1" in
+    handcrafted|cnn_resnet|cnn_vit) subdir="baseline_test" ;;
+    biot)                           subdir="biot_test" ;;
+    labram)                         subdir="labram_test" ;;
+    cbramod)                        subdir="cbramod_test" ;;
+    *) echo "model_test_dir: unknown model '$1'" >&2; return 1 ;;
+  esac
+  echo "${IESSEEG_DATA_ROOT}/${subdir}"
+}
+
 # Least-busy GPU with at least $1 MiB free (default 12000), or the pinned
 # CUDA_DEVICE when the caller set one.
 #

@@ -5,7 +5,7 @@
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../../scripts" && pwd)/lib/common.sh"
 
 STAGE_NAME="GBDT train"
-TRAIN_DATA_DIR="${IESSEEG_DATA_ROOT}/scalp_eeg_data_200HZ_np_format"
+TRAIN_DATA_DIR="$(model_data_dir handcrafted)"
 
 # Feature extraction dominates this baseline's runtime, and the same
 # windows are re-read across folds, so the cache is shared across the

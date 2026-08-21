@@ -5,7 +5,7 @@
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../../scripts" && pwd)/lib/common.sh"
 
 STAGE_NAME="LaBraM fine-tune"
-TRAIN_DATA_DIR="${IESSEEG_DATA_ROOT}/scalp_eeg_data_200HZ_np_format_labram"
+TRAIN_DATA_DIR="$(model_data_dir labram)"
 LABRAM_BASE_CKPT="${IESSEEG_PRETRAINED_DIR:-${IESSEEG_REPO_ROOT}/pretrained-models}/labram-base.pth"
 
 if [ ! -f "${LABRAM_BASE_CKPT}" ]; then

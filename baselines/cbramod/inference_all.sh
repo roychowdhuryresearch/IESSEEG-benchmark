@@ -3,7 +3,7 @@
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../../scripts" && pwd)/lib/common.sh"
 
 STAGE_NAME="CBraMod inference"
-TEST_DATA_DIR="${IESSEEG_DATA_ROOT}/cbramod_test"
+TEST_DATA_DIR="$(model_test_dir cbramod)"
 
 cbramod_inference () {
   local task="$1" fold="$2" label_key="$3" gpu="$4"

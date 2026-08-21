@@ -16,7 +16,7 @@ case "${ARCH}" in
 esac
 
 STAGE_NAME="${ARCH_DISPLAY} train"
-TRAIN_DATA_DIR="${IESSEEG_DATA_ROOT}/scalp_eeg_data_200HZ_np_format"
+TRAIN_DATA_DIR="$(model_data_dir cnn_resnet)"
 
 cnn_train () {
   local task="$1" fold="$2" label_key="$3" gpu="$4"

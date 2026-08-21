@@ -14,7 +14,7 @@ case "${ARCH}" in
 esac
 
 STAGE_NAME="${ARCH_DISPLAY} inference"
-TEST_DATA_DIR="${IESSEEG_DATA_ROOT}/baseline_test"
+TEST_DATA_DIR="$(model_test_dir cnn_resnet)"
 
 cnn_inference () {
   local task="$1" fold="$2" label_key="$3" gpu="$4"
