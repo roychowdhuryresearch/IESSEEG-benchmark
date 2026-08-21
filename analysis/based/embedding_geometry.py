@@ -130,8 +130,22 @@ def main():
             sil_condition=silhouette_score(Z, cnd),
         ))
         p = PCA(n_components=2).fit(Z)
-        coords[tag] = p.transform(Z)
+        coords[f"pca_{tag}"] = p.transform(Z)
         rows[-1]["pca2_var"] = float(p.explained_variance_ratio_.sum())
+        # UMAP layout for the figure: PCA keeps 39-60% of the variance here,
+        # which renders as structureless blobs; the neighbour-graph layout
+        # shows the cluster structure the quantitative metrics measure.
+        # Metrics above are computed in the full space, never on the layout.
+        try:
+            from umap import UMAP
+            coords[f"umap_{tag}"] = UMAP(
+                n_neighbors=10, min_dist=0.4, random_state=0,
+                init="pca").fit_transform(Z)
+        except ImportError:
+            from sklearn.manifold import TSNE
+            coords[f"umap_{tag}"] = TSNE(
+                n_components=2, perplexity=12, init="pca",
+                random_state=0).fit_transform(Z)
 
     df = pd.DataFrame(rows)
     df.to_csv(os.path.join(out_dir, "geometry_metrics.csv"), index=False)
@@ -140,9 +154,8 @@ def main():
     np.savez_compressed(
         os.path.join(out_dir, "geometry_pca_coords.npz"),
         segment_uid=scores.segment_uid.values, recording_id=rec,
-        cond=cnd, based=y,
-        **{f"pca_{k}": v for k, v in coords.items()})
-    print("saved PCA coords")
+        cond=cnd, based=y, **coords)
+    print("saved 2-D layouts (PCA + UMAP)")
 
 
 if __name__ == "__main__":
