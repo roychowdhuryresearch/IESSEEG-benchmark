@@ -41,11 +41,16 @@ SEV_CMAP = LinearSegmentedColormap.from_list(
     "severity", [POST_HUE, "#dedbd3", PRE_HUE])
 SEV_NORM = Normalize(vmin=0, vmax=5)
 
+# Figures are authored at the final print size (NeurIPS \linewidth = 5.5 in)
+# so every point size below is the size on the page. Type floor 6 pt for
+# labels; 5.2-5.6 pt only for tertiary annotations.
 plt.rcParams.update({
-    "font.family": "DejaVu Sans", "font.size": 8.5,
-    "axes.edgecolor": AXIS, "axes.labelcolor": INK_2, "axes.linewidth": 0.7,
+    "font.family": "DejaVu Sans", "font.size": 7,
+    "axes.edgecolor": AXIS, "axes.labelcolor": INK_2, "axes.linewidth": 0.5,
     "xtick.color": MUTED, "ytick.color": MUTED,
-    "xtick.labelsize": 7.5, "ytick.labelsize": 7.5,
+    "xtick.labelsize": 6, "ytick.labelsize": 6,
+    "xtick.major.size": 0, "ytick.major.size": 0, "xtick.major.pad": 1.5,
+    "ytick.major.pad": 1.5,
     "figure.facecolor": SURFACE, "axes.facecolor": SURFACE,
     "savefig.facecolor": SURFACE,
 })
@@ -66,7 +71,7 @@ def env(name):
 def save(fig, out_dir, name):
     for ext in ("pdf", "png"):
         fig.savefig(os.path.join(out_dir, f"{name}.{ext}"),
-                    bbox_inches="tight", dpi=220)
+                    bbox_inches="tight", dpi=300)
     plt.close(fig)
     print("wrote", name)
 
@@ -104,7 +109,7 @@ def draw_recording_hulls(ax, P, rec):
             ax.fill(sm[:, 0], sm[:, 1], color=INK_2, alpha=0.045, lw=0,
                     zorder=1)
             ax.plot(np.r_[sm[:, 0], sm[0, 0]], np.r_[sm[:, 1], sm[0, 1]],
-                    color="#d9d6cf", lw=0.9, zorder=1)
+                    color="#d9d6cf", lw=0.55, zorder=1)
 
 
 # ----------------------------------------------------------------------
@@ -115,61 +120,63 @@ def fig_geometry(out_dir):
             .set_index("representation")
     rec, based = z["recording_id"], z["based"].astype(float)
 
-    fig = plt.figure(figsize=(10.2, 4.35))
+    fig = plt.figure(figsize=(5.5, 2.5))
     gs = fig.add_gridspec(2, 4, height_ratios=[2.6, 1.0],
-                          hspace=0.30, wspace=0.12,
-                          left=0.085, right=0.905, top=0.90, bottom=0.05)
-    fig.text(0.015, 0.93, "A", fontsize=12, fontweight="bold", color=INK)
-    fig.text(0.015, 0.285, "B", fontsize=12, fontweight="bold", color=INK)
+                          hspace=0.32, wspace=0.12,
+                          left=0.115, right=0.90, top=0.89, bottom=0.05)
+    fig.text(0.015, 0.92, "A", fontsize=9, fontweight="bold", color=INK)
+    fig.text(0.015, 0.27, "B", fontsize=9, fontweight="bold", color=INK)
 
     for i, (key, label) in enumerate(REPS):
         ax = fig.add_subplot(gs[0, i])
         P = z[f"umap_{key}"]
         draw_recording_hulls(ax, P, rec)
-        ax.scatter(P[:, 0], P[:, 1], s=17, c=based, cmap=SEV_CMAP,
-                   norm=SEV_NORM, edgecolors="white", linewidths=0.5,
+        ax.scatter(P[:, 0], P[:, 1], s=6.5, c=based, cmap=SEV_CMAP,
+                   norm=SEV_NORM, edgecolors="white", linewidths=0.35,
                    zorder=3)
-        ax.set_title(label, fontsize=9.5, fontweight="bold", color=INK,
-                     pad=15)
+        ax.set_title(label, fontsize=6.8, fontweight="bold", color=INK,
+                     pad=9)
         knn = met.loc[key, "same_rec_1nn"]
-        ax.text(0.5, 1.013,
-                f"same-recording 1-NN {knn:.0%}  ·  chance 5%",
-                transform=ax.transAxes, ha="center", fontsize=6.9,
+        ax.text(0.5, 1.02, f"same-recording 1-NN {knn:.0%}",
+                transform=ax.transAxes, ha="center", fontsize=5.0,
                 color=MUTED)
         ax.set_xticks([]), ax.set_yticks([])
+        # light panel frame: floating scatter clouds need an edge
         for s in ax.spines.values():
-            s.set_visible(False)
+            s.set_visible(True)
+            s.set_color(GRID)
+            s.set_linewidth(0.5)
         m0, m1 = P.min(0), P.max(0)
         pad = 0.10 * (m1 - m0)
         ax.set_xlim(m0[0] - pad[0], m1[0] + pad[0])
         ax.set_ylim(m0[1] - pad[1], m1[1] + pad[1])
 
-    cax = fig.add_axes([0.925, 0.47, 0.011, 0.36])
+    cax = fig.add_axes([0.915, 0.44, 0.012, 0.38])
     cb = fig.colorbar(ScalarMappable(norm=SEV_NORM, cmap=SEV_CMAP), cax=cax)
     cb.set_ticks(range(6))
     cb.outline.set_edgecolor(GRID)
-    cb.ax.tick_params(labelsize=6.8, color=AXIS, length=2)
-    cax.set_title("expert\nBASED", fontsize=6.9, color=INK_2, pad=5)
+    cb.ax.tick_params(labelsize=5.2, color=AXIS, length=1.5, pad=1.5)
+    cax.set_title("expert\nBASED", fontsize=5.4, color=INK_2, pad=3)
 
     # hairline variance-share bars, aligned under each panel
     measures = [("eta2_recording", "recording identity", INK_2),
                 ("eta2_condition", "treatment condition", EPOCH_GRAY),
                 ("r2_based", "BASED severity", EPOCH_GRAY)]
-    fig.text(0.085, 0.315, "share of total variance explained by",
-             fontsize=7.2, color=MUTED)
+    fig.text(0.115, 0.30, "share of total variance explained by",
+             fontsize=5.6, color=MUTED)
     for i, (key, _) in enumerate(REPS):
         ax = fig.add_subplot(gs[1, i])
         ys = np.arange(3)[::-1]
         for y, (col, lbl, hue) in zip(ys, measures):
             v = met.loc[key, col]
             ax.barh(y, v, height=0.52, color=hue, zorder=2)
-            ax.text(v + 0.025, y, f"{v:.2f}", va="center", fontsize=7.0,
+            ax.text(v + 0.03, y, f"{v:.2f}", va="center", fontsize=5.6,
                     color=INK_2)
         ax.set_xlim(0, 1.0)
         ax.set_ylim(-0.6, 2.6)
         ax.set_xticks([])
         if i == 0:
-            ax.set_yticks(ys, [m[1] for m in measures], fontsize=7.4)
+            ax.set_yticks(ys, [m[1] for m in measures], fontsize=5.8)
             ax.tick_params(length=0)
         else:
             ax.set_yticks([])
@@ -191,30 +198,30 @@ def fig_prognosis(out_dir):
     df = df.set_index("model").loc[order]
     ys = np.arange(len(order))[::-1]
 
-    fig, ax = plt.subplots(figsize=(5.4, 2.9))
-    ax.axvline(0.5, color=AXIS, lw=0.9, zorder=1)
-    ax.text(0.503, ys.max() + 0.85, "chance", fontsize=7.0, color=MUTED)
+    fig, ax = plt.subplots(figsize=(3.4, 1.95))
+    ax.axvline(0.5, color=AXIS, lw=0.6, zorder=1)
+    ax.text(0.503, ys.max() + 0.8, "chance", fontsize=5.2, color=MUTED)
     for y, m in zip(ys, order):
         a, b = df.loc[m, "auroc_meaningful"], df.loc[m, "auroc_immediate"]
-        ax.plot([a, b], [y, y], color=GRID, lw=1.5, zorder=2)
-    ax.scatter(df.auroc_immediate, ys, s=30, facecolors=SURFACE,
-               edgecolors=MUTED, linewidths=1.2, zorder=3,
+        ax.plot([a, b], [y, y], color=GRID, lw=1.0, zorder=2)
+    ax.scatter(df.auroc_immediate, ys, s=11, facecolors=SURFACE,
+               edgecolors=MUTED, linewidths=0.8, zorder=3,
                label="immediate response")
-    ax.scatter(df.auroc_meaningful, ys, s=32, c=ACCENT,
-               edgecolors="white", linewidths=0.6, zorder=4,
+    ax.scatter(df.auroc_meaningful, ys, s=12, c=ACCENT,
+               edgecolors="white", linewidths=0.4, zorder=4,
                label="sustained response")
-    ax.set_yticks(ys, [disp[m] for m in order], fontsize=7.8)
+    ax.set_yticks(ys, [disp[m] for m in order], fontsize=5.8)
     ax.set_xlim(0.30, 0.70)
     ax.set_ylim(-0.9, ys.max() + 1.3)
     ax.set_xlabel("AUROC of the Task-1 case probability as a response "
                   "predictor\n(held-out folds, 50 cases; "
                   "$<$0.5 = higher confidence, worse outcome)",
-                  fontsize=7.7)
-    ax.legend(loc="lower left", frameon=False, fontsize=7.2,
+                  fontsize=5.6, labelpad=2)
+    ax.legend(loc="lower left", frameon=False, fontsize=5.2,
               handletextpad=0.25, labelspacing=0.3)
     for s in ("top", "right"):
         ax.spines[s].set_visible(False)
-    ax.grid(True, axis="x", color=GRID, linewidth=0.5)
+    ax.grid(True, axis="x", color=GRID, linewidth=0.35)
     ax.set_axisbelow(True)
     save(fig, out_dir, "fig_confidence_prognosis")
 

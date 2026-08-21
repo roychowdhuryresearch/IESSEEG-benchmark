@@ -39,11 +39,15 @@ SURFACE = "#fcfcfb"
 INK, INK_2, MUTED = "#0b0b0b", "#52514e", "#898781"
 GRID, AXIS = "#e1e0d9", "#c3c2b7"
 
+# Figures are authored at the final print size (NeurIPS \linewidth = 5.5 in)
+# so every point size below is the size on the page. Type floor 6 pt.
 plt.rcParams.update({
-    "font.family": "DejaVu Sans", "font.size": 8.5,
-    "axes.edgecolor": AXIS, "axes.labelcolor": INK_2, "axes.linewidth": 0.7,
+    "font.family": "DejaVu Sans", "font.size": 7,
+    "axes.edgecolor": AXIS, "axes.labelcolor": INK_2, "axes.linewidth": 0.5,
     "xtick.color": MUTED, "ytick.color": MUTED,
-    "xtick.labelsize": 7.5, "ytick.labelsize": 7.5,
+    "xtick.labelsize": 6, "ytick.labelsize": 6,
+    "xtick.major.size": 0, "ytick.major.size": 0, "xtick.major.pad": 1.5,
+    "ytick.major.pad": 1.5,
     "figure.facecolor": SURFACE, "axes.facecolor": SURFACE,
     "savefig.facecolor": SURFACE,
 })
@@ -87,13 +91,13 @@ def probe_oof(results, model, scores):
 def style(ax):
     for s in ("top", "right"):
         ax.spines[s].set_visible(False)
-    ax.grid(True, axis="y", color=GRID, linewidth=0.5)
+    ax.grid(True, axis="y", color=GRID, linewidth=0.35)
     ax.set_axisbelow(True)
 
 
 def strip(ax, text):
-    ax.text(0.5, 1.02, text, transform=ax.transAxes, ha="center",
-            fontsize=7.0, color=MUTED)
+    ax.text(0.5, 1.025, text, transform=ax.transAxes, ha="center",
+            fontsize=5.6, color=MUTED)
 
 
 def fmt(v):
@@ -104,13 +108,13 @@ def main():
     results, out_dir = env("IESSEEG_BASED_RESULTS"), env("IESSEEG_OUT")
     rng = np.random.default_rng(0)
 
-    fig, axes = plt.subplots(2, 3, figsize=(10.0, 5.1),
+    fig, axes = plt.subplots(2, 3, figsize=(5.5, 3.0),
                              sharex=True,
-                             gridspec_kw=dict(hspace=0.36, wspace=0.16,
-                                              left=0.065, right=0.985,
-                                              top=0.90, bottom=0.15))
-    fig.text(0.012, 0.945, "A", fontsize=12, fontweight="bold", color=INK)
-    fig.text(0.012, 0.47, "B", fontsize=12, fontweight="bold", color=INK)
+                             gridspec_kw=dict(hspace=0.44, wspace=0.20,
+                                              left=0.10, right=0.99,
+                                              top=0.89, bottom=0.175))
+    fig.text(0.010, 0.945, "A", fontsize=9, fontweight="bold", color=INK)
+    fig.text(0.010, 0.475, "B", fontsize=9, fontweight="bold", color=INK)
 
     for col, (key, label) in enumerate(MODELS):
         scores = pd.read_csv(os.path.join(results, f"{key}_scores.csv")) \
@@ -127,12 +131,12 @@ def main():
         ax = axes[0, col]
         for tag, hue in (("PRE", PRE_HUE), ("POST", POST_HUE)):
             med = np.median(prob[scores.cond == tag])
-            ax.axhline(med, color=hue, lw=1.0, alpha=0.45, zorder=1)
-        ax.scatter(jit, prob, s=8, c=EPOCH_GRAY, alpha=0.55, lw=0, zorder=2)
+            ax.axhline(med, color=hue, lw=0.7, alpha=0.45, zorder=1)
+        ax.scatter(jit, prob, s=2.6, c=EPOCH_GRAY, alpha=0.55, lw=0, zorder=2)
         for tag, hue in (("PRE", PRE_HUE), ("POST", POST_HUE)):
             m = rec.cond == tag
-            ax.scatter(rec.based[m], rec.prob[m], s=46, c=hue,
-                       edgecolors="white", linewidths=0.9, zorder=3)
+            ax.scatter(rec.based[m], rec.prob[m], s=15, c=hue,
+                       edgecolors="white", linewidths=0.5, zorder=3)
         pooled = stats.spearmanr(prob, y)
         r_pre = stats.spearmanr(prob[scores.cond == "PRE"],
                                 y[scores.cond == "PRE"])
@@ -141,11 +145,11 @@ def main():
         strip(ax, f"pooled ρ {fmt(pooled.statistic)}   ·   "
                   f"pre {fmt(r_pre.statistic)}   ·   "
                   f"post {fmt(r_post.statistic)}")
-        ax.set_title(label, fontsize=9.5, fontweight="bold", color=INK,
-                     pad=16)
+        ax.set_title(label, fontsize=7.5, fontweight="bold", color=INK,
+                     pad=11)
         ax.set_ylim(-0.04, 1.06)
         if col == 0:
-            ax.set_ylabel("case probability", fontsize=8.2)
+            ax.set_ylabel("case probability", fontsize=6.6)
         else:
             ax.set_yticklabels([])
         style(ax)
@@ -155,38 +159,38 @@ def main():
         pred = probe_oof(results, key, scores)
         r = stats.spearmanr(pred, y)
         r2 = 1 - np.sum((y - pred) ** 2) / np.sum((y - y.mean()) ** 2)
-        ax.plot([-0.4, 5.4], [-0.4, 5.4], color=AXIS, lw=0.9, ls=(0, (4, 3)),
+        ax.plot([-0.4, 5.4], [-0.4, 5.4], color=AXIS, lw=0.6, ls=(0, (4, 3)),
                 zorder=1)
-        ax.scatter(jit, pred, s=8, c=EPOCH_GRAY, alpha=0.55, lw=0, zorder=2)
+        ax.scatter(jit, pred, s=2.6, c=EPOCH_GRAY, alpha=0.55, lw=0, zorder=2)
         rec_pred = pd.Series(pred).groupby(scores.recording_id).mean()
         for tag, hue in (("PRE", PRE_HUE), ("POST", POST_HUE)):
             m = rec.cond == tag
-            ax.scatter(rec.based[m], rec_pred[rec.index][m.values], s=46,
-                       c=hue, edgecolors="white", linewidths=0.9, zorder=3)
+            ax.scatter(rec.based[m], rec_pred[rec.index][m.values], s=15,
+                       c=hue, edgecolors="white", linewidths=0.5, zorder=3)
         strip(ax, f"probe ρ {fmt(r.statistic)}   ·   "
                   f"R² {fmt(r2)}")
         ax.set_xlim(-0.45, 5.45)
         ax.set_xticks(range(6))
-        ax.set_xlabel("expert BASED score", fontsize=8.2)
+        ax.set_xlabel("expert BASED score", fontsize=6.6, labelpad=1.5)
         if col == 0:
-            ax.set_ylabel("probe-predicted BASED", fontsize=8.2)
+            ax.set_ylabel("probe-predicted BASED", fontsize=6.6)
         style(ax)
 
     fig.legend(handles=[
-        Line2D([], [], marker="o", ls="", color=PRE_HUE, markersize=7,
+        Line2D([], [], marker="o", ls="", color=PRE_HUE, markersize=4.2,
                markeredgecolor="white", label="recording mean — pre-treatment"),
-        Line2D([], [], marker="o", ls="", color=POST_HUE, markersize=7,
+        Line2D([], [], marker="o", ls="", color=POST_HUE, markersize=4.2,
                markeredgecolor="white", label="recording mean — post-treatment"),
-        Line2D([], [], marker="o", ls="", color=EPOCH_GRAY, markersize=4.5,
+        Line2D([], [], marker="o", ls="", color=EPOCH_GRAY, markersize=2.8,
                label="single rated epoch"),
-        Line2D([], [], color=MUTED, lw=1.0, alpha=0.6,
+        Line2D([], [], color=MUTED, lw=0.7, alpha=0.6,
                label="condition median (row A)")],
-        loc="lower center", ncol=4, frameon=False, fontsize=7.4,
-        handletextpad=0.3, columnspacing=1.6, bbox_to_anchor=(0.52, -0.005))
+        loc="lower center", ncol=4, frameon=False, fontsize=5.6,
+        handletextpad=0.25, columnspacing=1.1, bbox_to_anchor=(0.53, -0.008))
 
     for ext in ("pdf", "png"):
         fig.savefig(os.path.join(out_dir, f"fig_based_alignment.{ext}"),
-                    bbox_inches="tight", dpi=220)
+                    bbox_inches="tight", dpi=300)
     print("wrote fig_based_alignment")
 
 
