@@ -1,236 +1,193 @@
 #!/usr/bin/env python
-"""Figure and stratified statistics for the BASED alignment analysis.
+"""Paper figure: case probability tracks treatment condition, not BASED.
 
-The headline correlation between a model's case probability and expert
-BASED is confounded: pre-treatment recordings have both high BASED and
-the appearance the models were trained to call "case", while
-post-treatment recordings have neither. Reporting the pooled correlation
-alone would credit the models with grading severity when what they are
-mostly doing is separating treated from untreated recordings.
+Redesign of the alignment figure. Individual epochs are de-emphasized in
+gray; the colored layer is the recording-level story (per-recording means,
+colored by treatment condition, plus condition medians), because the
+finding lives at that level: conditions separate, severity within a
+condition does not. Row B shows the ridge probe's out-of-fold predictions
+with the same emphasis structure.
 
-Every statistic here is therefore reported three ways: pooled, within
-pre-treatment, and within post-treatment. The figure is built so a reader
-sees that decomposition rather than taking it on trust: each condition
-gets a horizontal median reference, so the vertical gap between the two
-lines is the effect that exists and their flatness is the effect that
-does not.
+Inputs (env):
+  IESSEEG_BASED_RESULTS  dir with {model}_scores.csv + {model}_embeddings.npz
+  IESSEEG_BENCH_SPLITS   released splits/ (condition inference)
+  IESSEEG_OUT            output directory for the figure
 
-Encoding: treatment condition is nominal with two levels and carries the
-finding in both rows, so it takes categorical slots 1 and 2 throughout
-(blue, orange; validated at protanopia dE 24.7). BASED is on the x-axis
-of both rows rather than in the colour channel, which keeps one
-consistent legend for the whole figure.
+The probe is recomputed here (same protocol as analyze_based.py: RidgeCV,
+GroupKFold by recording) so the panel and the reported numbers can never
+drift apart.
 """
 
+import glob
 import os
 
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 import numpy as np
 import pandas as pd
-from matplotlib.lines import Line2D
 from scipy import stats
 from sklearn.linear_model import RidgeCV
 from sklearn.model_selection import GroupKFold
 from sklearn.preprocessing import StandardScaler
 
 MODELS = [("luna", "LUNA"), ("reve", "REVE"), ("eegpt", "EEGPT")]
-META = os.environ.get("IESSEEG_SUBJECT_META", "")
-RESULTS = "results"
-
-# Categorical slots 1 and 2, for the two treatment conditions.
 PRE_HUE, POST_HUE = "#2a78d6", "#eb6834"
-
+EPOCH_GRAY = "#b9b6ae"
 SURFACE = "#fcfcfb"
 INK, INK_2, MUTED = "#0b0b0b", "#52514e", "#898781"
 GRID, AXIS = "#e1e0d9", "#c3c2b7"
 
 plt.rcParams.update({
     "font.family": "DejaVu Sans", "font.size": 8.5,
-    "axes.edgecolor": AXIS, "axes.labelcolor": INK_2, "axes.linewidth": 0.8,
+    "axes.edgecolor": AXIS, "axes.labelcolor": INK_2, "axes.linewidth": 0.7,
     "xtick.color": MUTED, "ytick.color": MUTED,
-    "xtick.labelsize": 8, "ytick.labelsize": 8,
+    "xtick.labelsize": 7.5, "ytick.labelsize": 7.5,
     "figure.facecolor": SURFACE, "axes.facecolor": SURFACE,
     "savefig.facecolor": SURFACE,
 })
 
 
+def env(name):
+    v = os.environ.get(name)
+    if not v:
+        raise SystemExit(f"Set {name}")
+    return v
+
+
+def condition_map(recordings):
+    pre = set()
+    for f in glob.glob(os.path.join(env("IESSEEG_BENCH_SPLITS"), "**", "*.csv"),
+                       recursive=True):
+        try:
+            pre |= set(pd.read_csv(f, usecols=["long_recording_id"])
+                       ["long_recording_id"].unique())
+        except Exception:
+            continue
+    return {r: ("PRE" if r in pre else "POST") for r in recordings}
+
+
+def probe_oof(results, model, scores):
+    z = np.load(os.path.join(results, f"{model}_embeddings.npz"),
+                allow_pickle=True)
+    by = {str(u): z["emb"][i] for i, u in enumerate(z["segment_uid"])}
+    X = np.stack([by[u] for u in scores.segment_uid]).astype(float)
+    y = scores.based.values.astype(float)
+    groups = scores.recording_id.values
+    pred = np.zeros_like(y)
+    for tr, te in GroupKFold(n_splits=5).split(X, y, groups):
+        sc = StandardScaler().fit(X[tr])
+        rg = RidgeCV(alphas=np.logspace(-2, 5, 30)).fit(
+            sc.transform(X[tr]), y[tr])
+        pred[te] = rg.predict(sc.transform(X[te]))
+    return pred
+
+
 def style(ax):
-    """Hairline, recessive chrome: grid one shade off the surface, no box."""
-    ax.grid(True, color=GRID, linewidth=0.6)
+    for s in ("top", "right"):
+        ax.spines[s].set_visible(False)
+    ax.grid(True, axis="y", color=GRID, linewidth=0.5)
     ax.set_axisbelow(True)
-    for side in ("top", "right"):
-        ax.spines[side].set_visible(False)
-    for side in ("left", "bottom"):
-        ax.spines[side].set_color(AXIS)
 
 
-def probe_predictions(emb_by_uid, rows, n_splits=5):
-    """Out-of-fold ridge predictions of BASED from the embedding.
-
-    Grouped by recording, so a recording's seven rater epochs never span
-    the train/test boundary; without that the probe scores itself on
-    near-duplicates and looks far better than it is.
-    """
-    X = np.stack([emb_by_uid[u] for u in rows.segment_uid])
-    y = rows.based.values.astype(float)
-    groups = rows.recording_id.values
-    pred = np.zeros_like(y, dtype=float)
-    for tr, te in GroupKFold(n_splits=min(n_splits, len(np.unique(groups)))).split(X, y, groups):
-        sc = StandardScaler().fit(X[tr])
-        rg = RidgeCV(alphas=np.logspace(-2, 5, 30)).fit(sc.transform(X[tr]), y[tr])
-        pred[te] = rg.predict(sc.transform(X[te]))
-    return pred, y, rows.cond.values
+def strip(ax, text):
+    ax.text(0.5, 1.02, text, transform=ax.transAxes, ha="center",
+            fontsize=7.0, color=MUTED)
 
 
-def probe(emb_by_uid, rows, n_splits=5):
-    """Ridge from embedding to BASED, grouped by recording."""
-    X = np.stack([emb_by_uid[u] for u in rows.segment_uid])
-    y = rows.based.values.astype(float)
-    groups = rows.recording_id.values
-    n = min(n_splits, len(np.unique(groups)))
-    if n < 2 or len(np.unique(y)) < 2:
-        return np.nan, np.nan
-    pred = np.zeros_like(y, dtype=float)
-    for tr, te in GroupKFold(n_splits=n).split(X, y, groups):
-        sc = StandardScaler().fit(X[tr])
-        rg = RidgeCV(alphas=np.logspace(-2, 5, 30)).fit(sc.transform(X[tr]), y[tr])
-        pred[te] = rg.predict(sc.transform(X[te]))
-    r = stats.spearmanr(pred, y)
-    return r.statistic, r.pvalue
+def fmt(v):
+    return f"{v:+.2f}".replace("+0.", "+.").replace("-0.", "−.")
 
 
 def main():
-    if not META:
-        raise SystemExit("Set IESSEEG_SUBJECT_META to the subject metadata CSV.")
-    cond = pd.read_csv(META).drop_duplicates("long_recording_id") \
-             .set_index("long_recording_id")["pre_post_treatment_label"]
+    results, out_dir = env("IESSEEG_BASED_RESULTS"), env("IESSEEG_OUT")
+    rng = np.random.default_rng(0)
 
-    fig, axes = plt.subplots(2, 3, figsize=(10.6, 6.8))
-    summary = []
+    fig, axes = plt.subplots(2, 3, figsize=(10.0, 5.1),
+                             sharex=True,
+                             gridspec_kw=dict(hspace=0.36, wspace=0.16,
+                                              left=0.065, right=0.985,
+                                              top=0.90, bottom=0.15))
+    fig.text(0.012, 0.945, "A", fontsize=12, fontweight="bold", color=INK)
+    fig.text(0.012, 0.47, "B", fontsize=12, fontweight="bold", color=INK)
 
     for col, (key, label) in enumerate(MODELS):
-        scores = pd.read_csv(os.path.join(RESULTS, f"{key}_scores.csv"))
+        scores = pd.read_csv(os.path.join(results, f"{key}_scores.csv")) \
+                   .drop_duplicates("segment_uid").reset_index(drop=True)
+        cond = condition_map(scores.recording_id.unique())
         scores["cond"] = scores.recording_id.map(cond)
-        z = np.load(os.path.join(RESULTS, f"{key}_embeddings.npz"), allow_pickle=True)
-        emb_by_uid = {str(u): z["emb"][i] for i, u in enumerate(z["segment_uid"])}
+        y, prob = scores.based.values.astype(float), scores.mean_prob.values
+        jit = y + rng.uniform(-0.13, 0.13, len(y))
+        rec = scores.groupby("recording_id").agg(
+            based=("based", "mean"), prob=("mean_prob", "mean"),
+            cond=("cond", "first"))
 
-        pooled = stats.spearmanr(scores.mean_prob, scores.based)
-        strat = {c: stats.spearmanr(g.mean_prob, g.based)
-                 for c, g in scores.groupby("cond")}
-
-        # ---------------- A: decision level ----------------
+        # ---- row A: probability vs BASED --------------------------------
         ax = axes[0, col]
-        style(ax)
-        rng = np.random.default_rng(7)
-        for c, hue in (("PRE", PRE_HUE), ("POST", POST_HUE)):
-            g = scores[scores.cond == c]
-            jitter = (rng.random(len(g)) - 0.5) * 0.30
-            # 2px surface ring keeps overlapping points readable.
-            ax.scatter(g.based + jitter, g.mean_prob, s=30, c=hue, alpha=0.75,
-                       linewidths=0.9, edgecolors=SURFACE, zorder=3)
-            # A horizontal reference at the condition's median. A
-            # median-per-BASED-level trace was tried and discarded: with
-            # 2 pre-treatment points at BASED 2 and 45 at BASED 5, it
-            # zigzagged and implied within-condition structure that the
-            # rank correlation says is not there. A flat line states the
-            # separation between conditions without inventing a trend.
-            ax.axhline(g.mean_prob.median(), color=hue, linewidth=1.6,
-                       alpha=0.9, zorder=2)
-
-        ax.set_title(label, fontsize=10.5, color=INK, pad=14, fontweight="bold")
-        ax.text(0.5, 1.012,
-                f"pooled ρ={pooled.statistic:+.2f}   ·   "
-                f"PRE {strat['PRE'].statistic:+.2f}   ·   "
-                f"POST {strat['POST'].statistic:+.2f}",
-                transform=ax.transAxes, ha="center", va="bottom",
-                fontsize=7.6, color=INK_2)
-        ax.set_xlabel("expert BASED score", color=INK_2)
+        for tag, hue in (("PRE", PRE_HUE), ("POST", POST_HUE)):
+            med = np.median(prob[scores.cond == tag])
+            ax.axhline(med, color=hue, lw=1.0, alpha=0.45, zorder=1)
+        ax.scatter(jit, prob, s=8, c=EPOCH_GRAY, alpha=0.55, lw=0, zorder=2)
+        for tag, hue in (("PRE", PRE_HUE), ("POST", POST_HUE)):
+            m = rec.cond == tag
+            ax.scatter(rec.based[m], rec.prob[m], s=46, c=hue,
+                       edgecolors="white", linewidths=0.9, zorder=3)
+        pooled = stats.spearmanr(prob, y)
+        r_pre = stats.spearmanr(prob[scores.cond == "PRE"],
+                                y[scores.cond == "PRE"])
+        r_post = stats.spearmanr(prob[scores.cond == "POST"],
+                                 y[scores.cond == "POST"])
+        strip(ax, f"pooled ρ {fmt(pooled.statistic)}   ·   "
+                  f"pre {fmt(r_pre.statistic)}   ·   "
+                  f"post {fmt(r_post.statistic)}")
+        ax.set_title(label, fontsize=9.5, fontweight="bold", color=INK,
+                     pad=16)
+        ax.set_ylim(-0.04, 1.06)
         if col == 0:
-            ax.set_ylabel("model case probability", color=INK_2)
-        ax.set_xticks(range(6))
-        ax.set_xlim(-0.55, 5.55)
-        ax.set_ylim(-0.04, 1.04)
+            ax.set_ylabel("case probability", fontsize=8.2)
+        else:
+            ax.set_yticklabels([])
+        style(ax)
 
-        # ---------------- B: representation level ----------------
-        # A PCA scatter coloured by BASED was tried first and dropped: it
-        # only shows severity if PC1/PC2 happen to align with it, and a
-        # one-hue ordinal ramp over six levels reads as an undifferentiated
-        # wash. Plotting the probe's own predictions against the truth
-        # answers the question directly -- if the embedding encoded BASED
-        # the points would follow the diagonal -- and colouring by
-        # condition shows what the probe is actually keying on.
+        # ---- row B: probe predictions vs truth --------------------------
         ax = axes[1, col]
-        style(ax)
-        pred, y, cond_of = probe_predictions(emb_by_uid, scores)
-
-        lo, hi = -0.4, 5.4
-        ax.plot([lo, hi], [lo, hi], color=AXIS, linewidth=1.0, zorder=1)
-        rng2 = np.random.default_rng(11)
-        for c, hue in (("PRE", PRE_HUE), ("POST", POST_HUE)):
-            sel = cond_of == c
-            jitter = (rng2.random(sel.sum()) - 0.5) * 0.30
-            ax.scatter(y[sel] + jitter, pred[sel], s=30, c=hue, alpha=0.75,
-                       linewidths=0.9, edgecolors=SURFACE, zorder=3)
-
-        probe_rho = stats.spearmanr(pred, y).statistic
-        ss_res = ((y - pred) ** 2).sum(); ss_tot = ((y - y.mean()) ** 2).sum()
-        ax.text(0.5, 1.012,
-                f"probe ρ={probe_rho:+.2f}   ·   R²={1 - ss_res / ss_tot:+.2f}",
-                transform=ax.transAxes, ha="center", va="bottom",
-                fontsize=7.6, color=INK_2)
-        ax.set_xlabel("expert BASED score", color=INK_2)
+        pred = probe_oof(results, key, scores)
+        r = stats.spearmanr(pred, y)
+        r2 = 1 - np.sum((y - pred) ** 2) / np.sum((y - y.mean()) ** 2)
+        ax.plot([-0.4, 5.4], [-0.4, 5.4], color=AXIS, lw=0.9, ls=(0, (4, 3)),
+                zorder=1)
+        ax.scatter(jit, pred, s=8, c=EPOCH_GRAY, alpha=0.55, lw=0, zorder=2)
+        rec_pred = pd.Series(pred).groupby(scores.recording_id).mean()
+        for tag, hue in (("PRE", PRE_HUE), ("POST", POST_HUE)):
+            m = rec.cond == tag
+            ax.scatter(rec.based[m], rec_pred[rec.index][m.values], s=46,
+                       c=hue, edgecolors="white", linewidths=0.9, zorder=3)
+        strip(ax, f"probe ρ {fmt(r.statistic)}   ·   "
+                  f"R² {fmt(r2)}")
+        ax.set_xlim(-0.45, 5.45)
+        ax.set_xticks(range(6))
+        ax.set_xlabel("expert BASED score", fontsize=8.2)
         if col == 0:
-            ax.set_ylabel("BASED predicted\nfrom embedding", color=INK_2)
-        ax.set_xticks(range(6)); ax.set_xlim(lo, hi); ax.set_ylim(lo, hi)
+            ax.set_ylabel("probe-predicted BASED", fontsize=8.2)
+        style(ax)
 
-        summary.append(dict(
-            model=label, n=len(scores),
-            rho_pooled=pooled.statistic, p_pooled=pooled.pvalue,
-            rho_pre=strat["PRE"].statistic, p_pre=strat["PRE"].pvalue,
-            rho_post=strat["POST"].statistic, p_post=strat["POST"].pvalue,
-            prob_pre=scores[scores.cond == "PRE"].mean_prob.mean(),
-            prob_post=scores[scores.cond == "POST"].mean_prob.mean(),
-            probe_rho_pooled=probe(emb_by_uid, scores)[0],
-            probe_rho_pre=probe(emb_by_uid, scores[scores.cond == "PRE"])[0],
-        ))
+    fig.legend(handles=[
+        Line2D([], [], marker="o", ls="", color=PRE_HUE, markersize=7,
+               markeredgecolor="white", label="recording mean — pre-treatment"),
+        Line2D([], [], marker="o", ls="", color=POST_HUE, markersize=7,
+               markeredgecolor="white", label="recording mean — post-treatment"),
+        Line2D([], [], marker="o", ls="", color=EPOCH_GRAY, markersize=4.5,
+               label="single rated epoch"),
+        Line2D([], [], color=MUTED, lw=1.0, alpha=0.6,
+               label="condition median (row A)")],
+        loc="lower center", ncol=4, frameon=False, fontsize=7.4,
+        handletextpad=0.3, columnspacing=1.6, bbox_to_anchor=(0.52, -0.005))
 
-    # Identity is never colour-alone: a key for the categorical row, a
-    # scale legend for the ordinal one.
-    handles = [
-        Line2D([], [], marker="o", linestyle="-", linewidth=1.6, color=PRE_HUE,
-               markersize=6, markeredgecolor=SURFACE, markeredgewidth=0.9,
-               label="pre-treatment  (n=56)"),
-        Line2D([], [], marker="o", linestyle="-", linewidth=1.6, color=POST_HUE,
-               markersize=6, markeredgecolor=SURFACE, markeredgewidth=0.9,
-               label="post-treatment  (n=59)"),
-    ]
-    leg = axes[0, 0].legend(handles=handles, loc="lower left", fontsize=7.4,
-                            frameon=True, framealpha=0.96, edgecolor=GRID,
-                            handlelength=2.0, borderpad=0.5,
-                            title="line = condition median")
-    leg.get_title().set_fontsize(7.0)
-    leg.get_title().set_color(MUTED)
-    for text in leg.get_texts():
-        text.set_color(INK_2)
-
-    fig.tight_layout(rect=[0.02, 0.0, 1.0, 0.935])
-
-    fig.text(0.012, 0.925, "A", fontsize=12, fontweight="bold", color=INK)
-    fig.text(0.012, 0.455, "B", fontsize=12, fontweight="bold", color=INK)
-    fig.text(0.54, 0.972,
-             "Case probability tracks treatment condition, not BASED severity",
-             ha="center", fontsize=11.5, color=INK, fontweight="bold")
-
-    out = os.path.join(RESULTS, "based_alignment.png")
-    fig.savefig(out, dpi=300, bbox_inches="tight")
-    fig.savefig(out.replace(".png", ".pdf"), bbox_inches="tight")
-    print(f"figure -> {out}")
-
-    df = pd.DataFrame(summary)
-    df.to_csv(os.path.join(RESULTS, "based_alignment_stratified.csv"), index=False)
-    print("\n" + df.round(3).to_string(index=False))
+    for ext in ("pdf", "png"):
+        fig.savefig(os.path.join(out_dir, f"fig_based_alignment.{ext}"),
+                    bbox_inches="tight", dpi=220)
+    print("wrote fig_based_alignment")
 
 
 if __name__ == "__main__":
