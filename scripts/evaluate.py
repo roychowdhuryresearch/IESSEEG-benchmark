@@ -34,10 +34,11 @@ def score_pending(results_root, models, force):
 
         for dirpath, _, filenames in os.walk(result_dir):
             for filename in filenames:
+                # Matches both "inference_results.csv" and the CNN
+                # baselines' "<tag>_inference_results.csv", while excluding
+                # the "_window.csv" dumps, which are per-window diagnostics
+                # rather than the clip-level predictions being scored.
                 if not filename.endswith("inference_results.csv"):
-                    continue
-                # Window-level dumps are diagnostics, not clip-level runs.
-                if filename.endswith("inference_results_window.csv"):
                     continue
 
                 prediction_csv = os.path.join(dirpath, filename)
