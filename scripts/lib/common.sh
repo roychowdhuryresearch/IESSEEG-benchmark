@@ -75,7 +75,7 @@ split_csv () {  # task fold split -> path
 model_data_dir () {  # model -> preprocessed training tree
   local subdir
   case "$1" in
-    handcrafted|cnn_resnet|cnn_vit) subdir="scalp_eeg_data_200HZ_np_format" ;;
+    handcrafted|cnn_resnet|cnn_vit|luna) subdir="scalp_eeg_data_200HZ_np_format" ;;
     biot)                           subdir="scalp_eeg_data_200HZ_np_format_biot" ;;
     labram)                         subdir="scalp_eeg_data_200HZ_np_format_labram" ;;
     cbramod)                        subdir="scalp_eeg_data_200HZ_np_format_cbramod" ;;
@@ -87,7 +87,7 @@ model_data_dir () {  # model -> preprocessed training tree
 model_test_dir () {  # model -> Routine-Clip evaluation tree
   local subdir
   case "$1" in
-    handcrafted|cnn_resnet|cnn_vit) subdir="baseline_test" ;;
+    handcrafted|cnn_resnet|cnn_vit|luna) subdir="baseline_test" ;;
     biot)                           subdir="biot_test" ;;
     labram)                         subdir="labram_test" ;;
     cbramod)                        subdir="cbramod_test" ;;

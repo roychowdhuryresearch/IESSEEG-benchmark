@@ -22,7 +22,7 @@
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/common.sh"
 
-MODELS="${MODELS:-handcrafted cnn_resnet cnn_vit biot labram cbramod}"
+MODELS="${MODELS:-handcrafted cnn_resnet cnn_vit biot labram cbramod luna}"
 STAGE="${STAGE:-all}"   # train | inference | eval | all
 
 BASELINE_DIR="${IESSEEG_REPO_ROOT}/baselines"
@@ -38,6 +38,7 @@ declare -A MODEL_DIR=(
   [biot]="biot"
   [labram]="labram"
   [cbramod]="cbramod"
+  [luna]="luna"
 )
 declare -A TRAIN_SCRIPT=(
   [handcrafted]="train_all.sh"
@@ -46,6 +47,7 @@ declare -A TRAIN_SCRIPT=(
   [biot]="train_all.sh"
   [labram]="train_all.sh"
   [cbramod]="train_all.sh"
+  [luna]="train_all.sh"
 )
 declare -A INFER_SCRIPT=(
   [handcrafted]="inference_all.sh"
@@ -54,6 +56,7 @@ declare -A INFER_SCRIPT=(
   [biot]="inference_all.sh"
   [labram]="inference_all.sh"
   [cbramod]="inference_all.sh"
+  [luna]="inference_all.sh"
 )
 
 run_step () {

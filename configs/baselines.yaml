@@ -89,3 +89,29 @@ models:
     epochs: 50
     batch_size: 64
     lr: 3.0e-5
+
+  luna:
+    display_name: LUNA
+    # LUNA reuses the 22-channel bipolar tree: its montage reordering,
+    # polarity correction and 200 -> 256 Hz resampling happen at load
+    # time rather than in a separate preprocessing pass.
+    data_subdir: scalp_eeg_data_200HZ_np_format
+    test_subdir: baseline_test
+    montage: 22-channel TCP bipolar
+    checkpoint: LUNA_base.safetensors
+    variant: LUNA-Base (7M parameters)
+    sample_rate: 256
+    window_sec: 30
+    window_transform: zscore
+    epochs: 50
+    batch_size: 64
+    lr: 5.0e-4
+    weight_decay: 5.0e-2
+    layer_decay: 0.75
+    warmup_epochs: 5
+    patience: 8
+    # Validation steps coarsely through each clip; it only selects the
+    # epoch to keep, and test inference always tiles fully.
+    val_step_sec: 120
+    weights_license: CC BY-ND 4.0 (fine-tuning permitted, redistribution of
+      fine-tuned weights is not)

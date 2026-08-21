@@ -75,13 +75,28 @@ def test_every_registered_model_has_a_runner():
     from iesseeg.evaluation.aggregate import MODEL_ORDER
 
     assert set(MODEL_ORDER) == set(config.MODEL_DATA_SUBDIR)
+    assert set(MODEL_ORDER) == set(config.MODEL_BASELINE_DIR)
 
-    directories = {
-        "handcrafted": "handcrafted", "cnn_resnet": "cnn", "cnn_vit": "cnn",
-        "biot": "biot", "labram": "labram", "cbramod": "cbramod",
-    }
     for model in MODEL_ORDER:
-        model_dir = os.path.join(REPO_ROOT, "baselines", directories[model])
+        model_dir = os.path.join(REPO_ROOT, "baselines", config.MODEL_BASELINE_DIR[model])
         assert os.path.isdir(model_dir), f"{model}: missing {model_dir}"
         assert os.path.isfile(os.path.join(model_dir, "train_all.sh"))
         assert os.path.isfile(os.path.join(model_dir, "inference_all.sh"))
+
+
+def test_run_benchmark_registers_every_model():
+    """run_benchmark.sh declares its own model -> directory map in bash.
+
+    It drives the whole sweep, so a model missing from it would simply
+    never run rather than fail. Check it against the Python mapping.
+    """
+    script = open(os.path.join(REPO_ROOT, "scripts", "run_benchmark.sh")).read()
+
+    from iesseeg.evaluation.aggregate import MODEL_ORDER
+
+    for model in MODEL_ORDER:
+        assert f"[{model}]=" in script, f"{model} is not registered in run_benchmark.sh"
+
+    default_line = next(l for l in script.splitlines() if l.startswith("MODELS="))
+    for model in MODEL_ORDER:
+        assert model in default_line, f"{model} missing from run_benchmark.sh default MODELS"

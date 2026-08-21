@@ -10,6 +10,7 @@ Window transforms:
   "none"        window returned as (C, window_frames).           [LaBraM]
   "quantile"    scaled by its own 95th percentile amplitude.     [BIOT]
   "patch"       reshaped to (C, window_sec, sample_rate).        [CBraMod]
+  "zscore"      per-channel standardised over time.               [LUNA]
 """
 
 import os
@@ -51,10 +52,19 @@ def _transform_patch(window, n_channels, window_sec, sample_rate):
     return window.reshape(n_channels, window_sec, sample_rate)
 
 
+def _transform_zscore(window, n_channels, window_sec, sample_rate):
+    # Per-channel standardisation over time, which is what LUNA's
+    # fine-tuning task applies to its inputs.
+    mean = window.mean(axis=-1, keepdims=True)
+    std = window.std(axis=-1, keepdims=True)
+    return (window - mean) / (std + 1e-8)
+
+
 WINDOW_TRANSFORMS = {
     "none": _transform_none,
     "quantile": _transform_quantile,
     "patch": _transform_patch,
+    "zscore": _transform_zscore,
 }
 
 
@@ -81,6 +91,7 @@ class InMemoryRandomDataset(Dataset):
         scale_factor=1.0,
         train_iterations=10000,
         window_transform="none",
+        recording_transform=None,
         return_dict=True,
         verbose=False,
     ):
@@ -103,6 +114,7 @@ class InMemoryRandomDataset(Dataset):
         self.train_iterations = train_iterations
         self.window_transform = window_transform
         self._transform = WINDOW_TRANSFORMS[window_transform]
+        self.recording_transform = recording_transform
         self.return_dict = return_dict
         self.verbose = verbose
 
@@ -111,7 +123,7 @@ class InMemoryRandomDataset(Dataset):
             info_list, total=len(info_list), desc=f"[{mode}] Loading data"
         ):
             try:
-                raw_data, _ = load_recording(
+                raw_data, channel_names = load_recording(
                     data_dir, recording_id,
                     n_channels=n_channels, scale_factor=scale_factor, verbose=False,
                 )
@@ -119,6 +131,15 @@ class InMemoryRandomDataset(Dataset):
                 if verbose:
                     print(f"[WARN] Missing {recording_id}, skipping.")
                 continue
+
+            # Applied once per recording rather than per window, for
+            # whole-recording operations that would be wasteful to repeat:
+            # resampling to a model's pre-training rate, or reordering
+            # channels into the montage order a model expects. It runs
+            # before the window index is built, so window_sec/step_sec are
+            # interpreted at the post-transform sample rate.
+            if recording_transform is not None:
+                raw_data = recording_transform(raw_data, channel_names)
 
             self.memory.append({
                 "patient_id": patient_id,

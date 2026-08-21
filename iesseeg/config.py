@@ -46,6 +46,23 @@ MODEL_DATA_SUBDIR = {
     "biot": "scalp_eeg_data_200HZ_np_format_biot",
     "labram": "scalp_eeg_data_200HZ_np_format_labram",
     "cbramod": "scalp_eeg_data_200HZ_np_format_cbramod",
+    # LUNA consumes the same 22-channel bipolar tree as the in-house
+    # baselines; its montage reordering and 200->256 Hz resampling happen
+    # at load time rather than in a separate preprocessing pass.
+    "luna": "scalp_eeg_data_200HZ_np_format",
+}
+
+# Which baselines/ directory holds each model's runner scripts. Two
+# models can share a directory when one implementation serves both
+# (the CNN directory hosts the ResNet and the ViT).
+MODEL_BASELINE_DIR = {
+    "handcrafted": "handcrafted",
+    "cnn_resnet": "cnn",
+    "cnn_vit": "cnn",
+    "biot": "biot",
+    "labram": "labram",
+    "cbramod": "cbramod",
+    "luna": "luna",
 }
 
 MODEL_TEST_SUBDIR = {
@@ -55,6 +72,7 @@ MODEL_TEST_SUBDIR = {
     "biot": "biot_test",
     "labram": "labram_test",
     "cbramod": "cbramod_test",
+    "luna": "baseline_test",
 }
 
 N_FOLDS = 5

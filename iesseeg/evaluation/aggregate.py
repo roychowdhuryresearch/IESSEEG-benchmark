@@ -31,6 +31,7 @@ MODEL_RESULT_SUBDIR = {
     "biot": "biot/result/inference",
     "labram": "labram/result/inference",
     "cbramod": "cbramod/result/inference",
+    "luna": "luna/result/inference",
 }
 
 MODEL_DISPLAY = {
@@ -40,11 +41,12 @@ MODEL_DISPLAY = {
     "biot": "BIOT",
     "labram": "LaBraM",
     "cbramod": "CBraMod",
+    "luna": "LUNA",
 }
 
 # Row order used in the paper's tables: interpretable baselines first,
 # then from-scratch deep models, then pre-trained foundation models.
-MODEL_ORDER = ["handcrafted", "cnn_resnet", "cnn_vit", "biot", "labram", "cbramod"]
+MODEL_ORDER = ["handcrafted", "cnn_resnet", "cnn_vit", "biot", "labram", "cbramod", "luna"]
 
 TABLE_SPECS = {
     "case_control": dict(

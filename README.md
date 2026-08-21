@@ -47,6 +47,7 @@ deviation over the five folds.
 | `biot` | BIOT | 18-ch bipolar | 30 s | [official checkpoint](https://github.com/ycq091044/BIOT) |
 | `labram` | LaBraM | 19-ch TUEG | 10 s | [official checkpoint](https://github.com/935963004/LaBraM) |
 | `cbramod` | CBraMod | 19-ch TUEG | 30 s | [official checkpoint](https://github.com/wjq-learning/CBraMod) |
+| `luna` | LUNA-Base | 22-ch TCP bipolar | 30 s | [official checkpoint](https://huggingface.co/PulpBio/LUNA) |
 
 Foundation models are fine-tuned with their authors' recommended
 hyperparameters (see [`configs/baselines.yaml`](configs/baselines.yaml)),
@@ -77,6 +78,12 @@ model's official repository into `IESSEEG_PRETRAINED_DIR`:
 | `EEG-six-datasets-18-channels.ckpt` | BIOT |
 | `labram-base.pth` | LaBraM |
 | `pretrained_weights.pth` | CBraMod |
+| `LUNA_base.safetensors` | LUNA |
+
+LUNA's weights are released under CC BY-ND 4.0, which permits fine-tuning
+for internal use but not redistribution of the fine-tuned weights. This
+repository ships no checkpoints, so running the benchmark stays within
+that licence; do not publish the checkpoints it produces.
 
 ## Running
 
