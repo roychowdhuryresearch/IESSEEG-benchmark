@@ -174,7 +174,7 @@ def main():
     groups = scores.recording_id.values
     reprs = {"handcrafted_122": X}
     emb_dir = os.path.dirname(env("IESSEEG_BASED_SCORES"))
-    for model in ("luna", "reve", "eegpt"):
+    for model in ("labram", "luna", "reve", "eegpt"):
         z = np.load(os.path.join(emb_dir, f"{model}_embeddings.npz"),
                     allow_pickle=True)
         by_uid = {str(u): z["emb"][i] for i, u in enumerate(z["segment_uid"])}

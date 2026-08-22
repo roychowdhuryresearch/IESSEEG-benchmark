@@ -32,7 +32,8 @@ from sklearn.linear_model import RidgeCV
 from sklearn.model_selection import GroupKFold
 from sklearn.preprocessing import StandardScaler
 
-MODELS = [("luna", "LUNA"), ("reve", "REVE"), ("eegpt", "EEGPT")]
+MODELS = [("labram", "LaBraM"), ("luna", "LUNA"), ("reve", "REVE"),
+          ("eegpt", "EEGPT")]
 PRE_HUE, POST_HUE = "#2a78d6", "#eb6834"
 EPOCH_GRAY = "#b9b6ae"
 SURFACE = "#fcfcfb"
@@ -97,7 +98,7 @@ def style(ax):
 
 def strip(ax, text):
     ax.text(0.5, 1.025, text, transform=ax.transAxes, ha="center",
-            fontsize=5.6, color=MUTED)
+            fontsize=5.1, color=MUTED)
 
 
 def fmt(v):
@@ -108,7 +109,7 @@ def main():
     results, out_dir = env("IESSEEG_BASED_RESULTS"), env("IESSEEG_OUT")
     rng = np.random.default_rng(0)
 
-    fig, axes = plt.subplots(2, 3, figsize=(5.5, 3.0),
+    fig, axes = plt.subplots(2, len(MODELS), figsize=(5.5, 3.0),
                              sharex=True,
                              gridspec_kw=dict(hspace=0.44, wspace=0.20,
                                               left=0.10, right=0.99,
@@ -142,8 +143,8 @@ def main():
                                 y[scores.cond == "PRE"])
         r_post = stats.spearmanr(prob[scores.cond == "POST"],
                                  y[scores.cond == "POST"])
-        strip(ax, f"pooled ρ {fmt(pooled.statistic)}   ·   "
-                  f"pre {fmt(r_pre.statistic)}   ·   "
+        strip(ax, f"ρ {fmt(pooled.statistic)} · "
+                  f"pre {fmt(r_pre.statistic)} · "
                   f"post {fmt(r_post.statistic)}")
         ax.set_title(label, fontsize=7.5, fontweight="bold", color=INK,
                      pad=11)

@@ -102,7 +102,7 @@ def main():
     assert list(z["segment_uid"]) == list(scores.segment_uid)
     reprs["handcrafted_122"] = z["X"]
     emb_dir = os.path.dirname(env("IESSEEG_BASED_SCORES"))
-    for model in ("luna", "reve", "eegpt"):
+    for model in ("labram", "luna", "reve", "eegpt"):
         e = np.load(os.path.join(emb_dir, f"{model}_embeddings.npz"),
                     allow_pickle=True)
         by_uid = {str(u): e["emb"][i] for i, u in enumerate(e["segment_uid"])}

@@ -56,6 +56,7 @@ plt.rcParams.update({
 })
 
 REPS = [("handcrafted_122", "Clinical features"),
+        ("labram_embedding", "LaBraM"),
         ("luna_embedding", "LUNA"),
         ("reve_embedding", "REVE"),
         ("eegpt_embedding", "EEGPT")]
@@ -120,8 +121,8 @@ def fig_geometry(out_dir):
             .set_index("representation")
     rec, based = z["recording_id"], z["based"].astype(float)
 
-    fig = plt.figure(figsize=(5.5, 2.5))
-    gs = fig.add_gridspec(2, 4, height_ratios=[2.6, 1.0],
+    fig = plt.figure(figsize=(5.5, 2.35))
+    gs = fig.add_gridspec(2, len(REPS), height_ratios=[2.6, 1.0],
                           hspace=0.32, wspace=0.12,
                           left=0.115, right=0.90, top=0.89, bottom=0.05)
     fig.text(0.015, 0.92, "A", fontsize=9, fontweight="bold", color=INK)
@@ -137,8 +138,8 @@ def fig_geometry(out_dir):
         ax.set_title(label, fontsize=6.8, fontweight="bold", color=INK,
                      pad=9)
         knn = met.loc[key, "same_rec_1nn"]
-        ax.text(0.5, 1.02, f"same-recording 1-NN {knn:.0%}",
-                transform=ax.transAxes, ha="center", fontsize=5.0,
+        ax.text(0.5, 1.02, f"same-rec. 1-NN {knn:.0%}",
+                transform=ax.transAxes, ha="center", fontsize=4.8,
                 color=MUTED)
         ax.set_xticks([]), ax.set_yticks([])
         # light panel frame: floating scatter clouds need an edge
