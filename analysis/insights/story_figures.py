@@ -163,7 +163,151 @@ def draw_traces(ax, short_id, t0, n_ch=8, dur=10.0, label="", step=None,
     return step
 
 
-def fig_overview(out_dir, ctrl_id, case_id):
+def pick_severity_epochs():
+    """One expert-scored epoch at each of BASED 0, 3, 5 from the released
+    annotations (bipolar22 cache; the 0 comes from a post-treatment
+    recording, which the caption discloses)."""
+    scores = pd.read_csv(os.path.join(
+        os.path.dirname(env("IESSEEG_LABELS")), "..",
+        "based_analysis", "results", "labram_scores.csv"))
+    rec_mean = scores.groupby("recording_id").based.mean()
+    picks = {}
+    for target in (0.0, 3.0, 5.0):
+        rows = scores[scores.based == target].copy()
+        rows["rec_mean"] = rows.recording_id.map(rec_mean)
+        # anchor each exemplar in a recording whose panel consensus matches
+        # the target, so the excerpt is representative of that severity
+        rows = rows.sort_values("rec_mean")
+        picks[target] = (rows.iloc[0] if target == 0.0
+                         else rows.iloc[-1]).segment_uid
+    return picks
+
+
+def clean_epoch_window(uid, mode, n_ch=6, dur=5.0, sf=200):
+    """mode: 'low' -> calmest clean window, 'high' -> most florid clean
+    window, 'mid' -> median-amplitude clean window."""
+    z = np.load(os.path.join(env("IESSEEG_EPOCHS"), "bipolar22",
+                             f"{uid}.npz"), allow_pickle=True)
+    data = z["data"][:n_ch].astype(float)
+    n = int(dur * sf)
+    cands = []
+    for t0 in range(0, data.shape[1] - n, 2 * sf):
+        seg = data[:, t0:t0 + n]
+        seg = seg - seg.mean(axis=1, keepdims=True)
+        p95 = np.percentile(np.abs(seg), 95)
+        if seg.std(axis=1).min() > 1.0 and np.abs(seg).max() < 3.5 * p95:
+            cands.append((t0, p95))
+    cands.sort(key=lambda c: c[1])
+    idx = {"low": 0, "mid": len(cands) // 2, "high": -1}[mode]
+    best = cands[idx][0]
+    seg = data[:, best:best + n]
+    return seg - seg.mean(axis=1, keepdims=True)
+
+
+def flow_band(ax, x0, x1, y0a, y0b, y1a, y1b, color, alpha=0.28):
+    xs = np.linspace(x0, x1, 30)
+    ease = 0.5 * (1 - np.cos(np.pi * (xs - x0) / (x1 - x0)))
+    top = y0a + (y1a - y0a) * ease
+    bot = y0b + (y1b - y0b) * ease
+    ax.fill_between(xs, bot, top, color=color, alpha=alpha, lw=0)
+
+
+def fig_overview(out_dir):
+    picks = pick_severity_epochs()
+    fig = plt.figure(figsize=(5.5, 2.15))
+    gs = fig.add_gridspec(1, 2, width_ratios=[1.15, 1.0],
+                          left=0.012, right=0.995, top=0.86, bottom=0.04,
+                          wspace=0.10)
+
+    # -- A: released EEG along the severity standard -------------------
+    axA = fig.add_subplot(gs[0, 0])
+    axA.axis("off")
+    fig.text(0.012, 0.93, "A", fontsize=9, fontweight="bold", color=INK)
+    fig.text(0.055, 0.925,
+             "released EEG along the severity standard (5 s)",
+             fontsize=6.0, color=INK_2)
+    step, dur, sf = 150, 5.0, 200
+    from matplotlib.colors import LinearSegmentedColormap
+    sev = LinearSegmentedColormap.from_list(
+        "severity", [POST_HUE, "#dedbd3", PRE_HUE])
+    window_mode = {0.0: "low", 3.0: "mid", 5.0: "high"}
+    for k, (target, uid) in enumerate(sorted(picks.items())):
+        ax = axA.inset_axes([k * 0.345, 0.0, 0.31, 0.86])
+        seg = clean_epoch_window(uid, window_mode[target])
+        t = np.arange(seg.shape[1]) / sf
+        for i in range(seg.shape[0]):
+            ax.plot(t, np.clip(seg[i], -2.5 * step, 2.5 * step) - i * step,
+                    color=INK_2, lw=0.28)
+        ax.set_xlim(-0.05, dur)
+        ax.set_ylim(-(seg.shape[0] + 1.3) * step, 2.4 * step)
+        ax.set_xticks([]), ax.set_yticks([])
+        for s in ax.spines.values():
+            s.set_visible(False)
+        ax.set_title(f"BASED {int(target)}", fontsize=6.4, color=INK,
+                     pad=5)
+        # severity ramp swatch (the paper's diverging encoding) above
+        ax.plot([0.05, dur - 0.05], [2.0 * step] * 2, color=sev(target / 5),
+                lw=2.0, solid_capstyle="butt")
+        if k == 0:
+            y0 = -(seg.shape[0] + 1.0) * step
+            ax.plot([0.1, 1.1], [y0, y0], color=INK, lw=0.8)
+            ax.plot([0.1, 0.1], [y0, y0 + 200], color=INK, lw=0.8)
+            ax.text(0.65, y0 - 35, "1 s", ha="center", va="top",
+                    fontsize=4.6, color=INK_2)
+            ax.text(1.3, y0 + 100, "200 µV", va="center",
+                    fontsize=4.6, color=INK_2)
+
+    # -- B: label structure as proportional flow -----------------------
+    axB = fig.add_subplot(gs[0, 1])
+    axB.axis("off")
+    axB.set_xlim(0, 10)
+    axB.set_ylim(-8, 112)
+    fig.text(0.535, 0.93, "B", fontsize=9, fontweight="bold", color=INK)
+    fig.text(0.585, 0.925, "cohort and label structure (band width = subjects)",
+             fontsize=6.0, color=INK_2)
+    bw = 0.42
+    def block(x, y, h, color, label=None, count=None, side="right"):
+        axB.add_patch(plt.Rectangle((x, y), bw, h, fc=color, ec="none"))
+        if label:
+            tx = x + bw + 0.14 if side == "right" else x - 0.14
+            axB.text(tx, y + h / 2, f"{label}",
+                     ha="left" if side == "right" else "right",
+                     va="center", fontsize=5.2, color=INK_2)
+        if count:
+            axB.text(x + bw / 2, y + h / 2, str(count), ha="center",
+                     va="center", fontsize=5.0, color="white",
+                     fontweight="bold")
+    # columns: x=0 all; x=3.3 case/control; x=6.6 response; x=9 sustained
+    block(0.2, 3, 100, INK_2, count=100)
+    axB.text(0.4, 106, "100 infants\n266.9 h", ha="center", fontsize=5.4,
+             color=INK_2)
+    # cases top (y 53..103), controls bottom (y 3..53) -> add gap
+    flow_band(axB, 0.2 + bw, 3.5, 103, 53, 105, 55, BLUE)
+    flow_band(axB, 0.2 + bw, 3.5, 53, 3, 47, -3, "#b9b6ae")
+    block(3.5, 55, 50, BLUE, count=50)
+    axB.text(3.5 + bw / 2, 108, "IESS cases", ha="center", fontsize=5.4,
+             color=INK)
+    block(3.5, -3, 50, "#b9b6ae",
+          label="age-matched controls —\nno therapy, no outcome labels",
+          count=50)
+    # cases -> responders/non
+    flow_band(axB, 3.5 + bw, 6.7, 105, 73, 105, 73, GREEN)
+    flow_band(axB, 3.5 + bw, 6.7, 73, 55, 68, 50, ACCENT)
+    block(6.7, 73, 32, GREEN, count=32)
+    axB.text(6.7 + bw / 2, 108, "immediate\nresponders", ha="center",
+             fontsize=5.2, color=INK)
+    block(6.7, 50, 18, ACCENT, label="non-responders", count=18)
+    # responders -> sustained/relapse
+    flow_band(axB, 6.7 + bw, 9.2, 105, 77, 105, 77, GREEN)
+    flow_band(axB, 6.7 + bw, 9.2, 77, 73, 74, 70, ACCENT)
+    block(9.2, 77, 28, GREEN, label="sustained", count=28)
+    block(9.2, 70, 4, ACCENT, label="relapse", count=4)
+    axB.text(5.1, -7.5, "NISC outcomes: 2-week response · 4-week durability",
+             fontsize=5.0, color=MUTED, ha="center")
+    save(fig, out_dir, "fig_overview")
+
+
+def fig_overview_old(out_dir, ctrl_id, case_id):
     fig = plt.figure(figsize=(5.5, 2.55))
     gs = fig.add_gridspec(2, 2, width_ratios=[1.05, 1.6],
                           height_ratios=[1.9, 1.0],
@@ -326,7 +470,7 @@ def main():
     print("clips: ctrl", ctrl.short_recording_id,
           "episodic", episodic.short_recording_id,
           "absent", absent.short_recording_id, "hero", hero_case)
-    fig_overview(out_dir, ctrl.short_recording_id, hero_case)
+    fig_overview(out_dir)
     fig_window_timeline(out_dir, ctrl, episodic, absent, win)
     fig_severity_collapse(out_dir)
 
