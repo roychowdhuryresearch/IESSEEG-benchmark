@@ -66,14 +66,17 @@ def load_labram(labram_dir, fold, device):
 
 
 def main():
-    device = torch.device(os.environ.get("IESSEEG_DEVICE", "cuda:2"))
+    want = os.environ.get("IESSEEG_DEVICE", "cuda:0")
+    device = torch.device(want if torch.cuda.is_available() else "cpu")
     out_dir = env("IESSEEG_OUT")
     labram_dir = env("IESSEEG_LABRAM_DIR")
     epoch_dir = os.path.join(env("IESSEEG_BASED_EPOCHS"), "ref19")
 
+    # one row per rating; raters chose different windows, so the 115
+    # segment_uids are already unique (one epoch per rating)
     ref = pd.read_csv(env("IESSEEG_BASED_SCORES")) \
-            .drop_duplicates("segment_uid") \
             .sort_values("fold").reset_index(drop=True)
+    assert ref.segment_uid.is_unique
 
     rows, embs, uids = [], [], []
     model = input_chans = None
@@ -94,8 +97,9 @@ def main():
             x = rearrange(x, 'B N (A T) -> B N A T', T=PATCH) / 100
             feat = model.forward_features(x, input_chans=input_chans)
             logits = model.head(feat)
-            prob = F.softmax(logits, dim=-1)[:, 1].mean().item()
-            med = F.softmax(logits, dim=-1)[:, 1].median().item()
+            p1 = F.softmax(logits, dim=-1)[:, 1].cpu().numpy()
+            prob = float(p1.mean())
+            med = float(np.median(p1))  # np.median: matches the sibling scorer
             rows.append(dict(segment_uid=r.segment_uid,
                              recording_id=r.recording_id,
                              offset_sec=r.offset_sec, fold=int(r.fold),

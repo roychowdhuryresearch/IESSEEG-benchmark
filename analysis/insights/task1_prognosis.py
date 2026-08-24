@@ -96,7 +96,14 @@ def main():
         rows.append(row)
 
     ens = pd.DataFrame(subj_scores).mean(axis=1)
-    subj = subj.assign(prob=ens)  # labels identical across models
+    # labels are per-patient constants; bind them explicitly rather than
+    # reusing the loop-leaked frame from whichever model iterated last
+    labels_by_pat = meta.drop_duplicates("patient_id").set_index("patient_id")
+    subj = pd.DataFrame({
+        "prob": ens,
+        "immediate": labels_by_pat.immediate_responder.reindex(ens.index),
+        "meaningful": labels_by_pat.meaningful_responder.reindex(ens.index),
+    })
     row = {"model": "ensemble_mean", "n_cases": len(subj)}
     for task in ("immediate", "meaningful"):
         yb = (subj[task] == "Responder").astype(int)

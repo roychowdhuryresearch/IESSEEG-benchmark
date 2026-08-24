@@ -29,22 +29,14 @@ or against a single pooled predictions CSV with columns
 import argparse
 import glob
 import os
+import sys
 
 import numpy as np
 import pandas as pd
 from sklearn.metrics import roc_auc_score
 
-MODEL_RESULT_SUBDIR = {
-    "handcrafted": "handcrafted/result/inference",
-    "cnn_resnet": "cnn/result/cnn/inference",
-    "cnn_vit": "cnn/result/vit/inference",
-    "biot": "biot/result/inference",
-    "labram": "labram/result/inference",
-    "cbramod": "cbramod/result/inference",
-    "luna": "luna/result/inference",
-    "eegpt": "eegpt/result/inference",
-    "reve": "reve/result/inference",
-}
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from iesseeg.evaluation.aggregate import MODEL_RESULT_SUBDIR  # canonical
 TASKS = ("immediate_responder", "meaningful_responder")
 N_PERM = 10_000
 
@@ -59,6 +51,9 @@ def load_model_task(results_root, model, task, labels_csv):
                          f"{task}_fold{fold}")
         hits = [h for h in glob.glob(os.path.join(d, "*inference_results.csv"))
                 if not h.endswith("_window.csv")]
+        if len(hits) != 1:
+            raise SystemExit(f"{model} {task} fold{fold}: expected exactly "
+                             f"one inference CSV in {d}, found {len(hits)}")
         f = pd.read_csv(hits[0])
         rid = [c for c in f.columns if "recording_id" in c][0]
         f = f.rename(columns={rid: "short_recording_id"})
@@ -99,6 +94,8 @@ def main():
                     help="single CSV: subject_id,fold,score,label")
     ap.add_argument("--task", choices=TASKS)
     args = ap.parse_args()
+    if not args.predictions and not (args.results_root and args.labels_csv):
+        ap.error("provide --predictions, or both --results_root and --labels_csv")
 
     if args.predictions:
         subj = pd.read_csv(args.predictions).rename(
