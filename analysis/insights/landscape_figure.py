@@ -68,9 +68,13 @@ def main():
     xs = [c + 0.5 for c in IESSEEG_COLS]
     ax.plot([min(xs), max(xs)], [y + 0.18, y + 0.18], color=ACCENT,
             lw=1.1, zorder=2)
-    for x in xs:
-        ax.scatter(x, y + 0.18, s=16, c=ACCENT, edgecolors="white",
-                   linewidths=0.5, zorder=3)
+    for x, col in zip(xs, IESSEEG_COLS):
+        if col == 3:   # severity: released annotation, not yet a task
+            ax.scatter(x, y + 0.18, s=16, facecolors="white",
+                       edgecolors=ACCENT, linewidths=1.0, zorder=3)
+        else:
+            ax.scatter(x, y + 0.18, s=16, c=ACCENT, edgecolors="white",
+                       linewidths=0.5, zorder=3)
     ax.text(np.mean(xs), y - 0.02, "IESSEEG (ours)", ha="center", va="top",
             fontsize=6.2, color=ACCENT, fontweight="bold")
 
