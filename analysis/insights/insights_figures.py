@@ -121,10 +121,10 @@ def fig_geometry(out_dir):
             .set_index("representation")
     rec, based = z["recording_id"], z["based"].astype(float)
 
-    fig = plt.figure(figsize=(5.5, 2.35))
+    fig = plt.figure(figsize=(5.5, 2.6))
     gs = fig.add_gridspec(2, len(REPS), height_ratios=[2.6, 1.0],
                           hspace=0.32, wspace=0.12,
-                          left=0.115, right=0.90, top=0.89, bottom=0.05)
+                          left=0.082, right=0.945, top=0.90, bottom=0.05)
     fig.text(0.015, 0.92, "A", fontsize=9, fontweight="bold", color=INK)
     fig.text(0.015, 0.27, "B", fontsize=9, fontweight="bold", color=INK)
 
@@ -132,8 +132,8 @@ def fig_geometry(out_dir):
         ax = fig.add_subplot(gs[0, i])
         P = z[f"umap_{key}"]
         draw_recording_hulls(ax, P, rec)
-        ax.scatter(P[:, 0], P[:, 1], s=6.5, c=based, cmap=SEV_CMAP,
-                   norm=SEV_NORM, edgecolors="white", linewidths=0.35,
+        ax.scatter(P[:, 0], P[:, 1], s=8.5, c=based, cmap=SEV_CMAP,
+                   norm=SEV_NORM, edgecolors="white", linewidths=0.4,
                    zorder=3)
         ax.set_title(label, fontsize=6.8, fontweight="bold", color=INK,
                      pad=9)
@@ -152,7 +152,7 @@ def fig_geometry(out_dir):
         ax.set_xlim(m0[0] - pad[0], m1[0] + pad[0])
         ax.set_ylim(m0[1] - pad[1], m1[1] + pad[1])
 
-    cax = fig.add_axes([0.915, 0.44, 0.012, 0.38])
+    cax = fig.add_axes([0.958, 0.46, 0.010, 0.36])
     cb = fig.colorbar(ScalarMappable(norm=SEV_NORM, cmap=SEV_CMAP), cax=cax)
     cb.set_ticks(range(6))
     cb.outline.set_edgecolor(GRID)
@@ -160,10 +160,10 @@ def fig_geometry(out_dir):
     cax.set_title("expert\nBASED", fontsize=5.4, color=INK_2, pad=3)
 
     # hairline variance-share bars, aligned under each panel
-    measures = [("eta2_recording", "recording identity", INK_2),
-                ("eta2_condition", "treatment condition", EPOCH_GRAY),
-                ("r2_based", "BASED severity", EPOCH_GRAY)]
-    fig.text(0.115, 0.30, "share of total variance explained by",
+    measures = [("eta2_recording", "identity", INK_2),
+                ("eta2_condition", "condition", EPOCH_GRAY),
+                ("r2_based", "severity", EPOCH_GRAY)]
+    fig.text(0.082, 0.305, "share of total variance explained by recording identity / treatment condition / BASED severity",
              fontsize=5.6, color=MUTED)
     for i, (key, _) in enumerate(REPS):
         ax = fig.add_subplot(gs[1, i])

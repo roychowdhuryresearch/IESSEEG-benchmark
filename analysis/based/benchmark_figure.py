@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Benchmark results figure: nine baselines across the three tasks.
+"""Benchmark results figure (authored at NeurIPS print width, 5.5 in): nine baselines across the three tasks.
 
 The paper's tables carry the numbers; this carries the shape of the
 result, which is the actual claim: diagnosis is largely solved, both
@@ -48,19 +48,20 @@ FAMILY_LABEL = {"features": "clinical features",
                 "scratch": "trained from scratch",
                 "pretrained": "pre-trained foundation model"}
 
-TASKS = [("case_control", "Task 1 — Diagnosis"),
-         ("immediate_responder", "Task 2 — Immediate response"),
-         ("meaningful_responder", "Task 3 — Sustained response")]
+TASKS = [("case_control", "Task 1\nDiagnosis"),
+         ("immediate_responder", "Task 2\nImmediate response"),
+         ("meaningful_responder", "Task 3\nSustained response")]
 
 SURFACE = "#fcfcfb"
 INK, INK_2, MUTED = "#0b0b0b", "#52514e", "#898781"
 GRID, AXIS = "#e1e0d9", "#c3c2b7"
 
 plt.rcParams.update({
-    "font.family": "DejaVu Sans", "font.size": 8.5,
-    "axes.edgecolor": AXIS, "axes.labelcolor": INK_2, "axes.linewidth": 0.8,
+    "font.family": "DejaVu Sans", "font.size": 7,
+    "axes.edgecolor": AXIS, "axes.labelcolor": INK_2, "axes.linewidth": 0.5,
     "xtick.color": MUTED, "ytick.color": MUTED,
-    "xtick.labelsize": 8, "ytick.labelsize": 8.5,
+    "xtick.labelsize": 5.8, "ytick.labelsize": 6.2,
+    "xtick.major.size": 0, "ytick.major.size": 0, "xtick.major.pad": 1.5,
     "figure.facecolor": SURFACE, "axes.facecolor": SURFACE,
     "savefig.facecolor": SURFACE,
 })
@@ -71,11 +72,11 @@ def main():
         raise SystemExit("Set IESSEEG_BENCH_RESULTS to the results_summary.csv directory.")
     s = pd.read_csv(os.path.join(RESULTS, "results_summary.csv"))
 
-    fig, axes = plt.subplots(1, 3, figsize=(11.4, 3.9), sharey=True)
+    fig, axes = plt.subplots(1, 3, figsize=(5.5, 2.0), sharey=True)
     ys = np.arange(len(MODELS))[::-1]
 
     for ax, (task, title) in zip(axes, TASKS):
-        ax.grid(True, axis="x", color=GRID, linewidth=0.6)
+        ax.grid(True, axis="x", color=GRID, linewidth=0.4)
         ax.set_axisbelow(True)
         for side in ("top", "right", "left"):
             ax.spines[side].set_visible(False)
@@ -83,7 +84,7 @@ def main():
 
         # Chance is the baseline that matters for balanced accuracy, so it
         # is drawn once as recessive chrome rather than left implicit.
-        ax.axvline(0.5, color=AXIS, linewidth=1.0, zorder=1)
+        ax.axvline(0.5, color=AXIS, linewidth=0.7, zorder=1)
 
         for y, (key, label, family) in zip(ys, MODELS):
             row = s[(s.model == key) & (s.task == task)]
@@ -92,15 +93,16 @@ def main():
             m = float(row.balanced_accuracy_mean.iloc[0])
             sd = float(row.balanced_accuracy_std.iloc[0])
             hue = FAMILY_HUE[family]
-            ax.plot([m - sd, m + sd], [y, y], color=hue, linewidth=1.8,
+            ax.plot([m - sd, m + sd], [y, y], color=hue, linewidth=1.1,
                     alpha=0.45, solid_capstyle="round", zorder=2)
-            ax.plot([m], [y], marker="o", markersize=7, color=hue,
-                    markeredgecolor=SURFACE, markeredgewidth=1.1, zorder=3)
+            ax.plot([m], [y], marker="o", markersize=3.4, color=hue,
+                    markeredgecolor=SURFACE, markeredgewidth=0.6, zorder=3)
 
-        ax.set_title(title, fontsize=9.5, color=INK, pad=7, fontweight="bold")
+        ax.set_title(title, fontsize=6.6, color=INK, pad=3, fontweight="bold")
         ax.set_xlim(0.28, 1.02)
         ax.set_xticks([0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0])
-        ax.set_xlabel("balanced accuracy", color=INK_2)
+        ax.set_xticklabels([".4", ".5", ".6", ".7", ".8", ".9", "1"])
+        ax.set_xlabel("balanced accuracy", color=INK_2, fontsize=6.2, labelpad=1.5)
         ax.set_ylim(-0.7, len(MODELS) - 0.3)
         # sharey leaves tick marks on the inner panels even with the left
         # spine hidden; they read as stray dashes between panels.
@@ -111,28 +113,26 @@ def main():
     axes[0].tick_params(axis="y", length=0)
 
     # "chance" is annotated once, on the panel where it is the whole story.
-    axes[1].text(0.5, -0.62, "chance", fontsize=7.4, color=MUTED,
+    axes[1].text(0.5, -0.66, "chance", fontsize=5.0, color=MUTED,
                  ha="center", va="bottom",
                  bbox=dict(facecolor=SURFACE, edgecolor="none", pad=1.5))
 
-    handles = [Line2D([], [], marker="o", linestyle="-", linewidth=1.8,
-                      color=FAMILY_HUE[f], markersize=6.5,
-                      markeredgecolor=SURFACE, markeredgewidth=1.1,
+    handles = [Line2D([], [], marker="o", linestyle="-", linewidth=1.1,
+                      color=FAMILY_HUE[f], markersize=3.4,
+                      markeredgecolor=SURFACE, markeredgewidth=0.6,
                       label=FAMILY_LABEL[f])
                for f in ("features", "scratch", "pretrained")]
-    leg = fig.legend(handles=handles, loc="lower center", ncol=3, fontsize=8,
-                     frameon=False, bbox_to_anchor=(0.55, -0.055),
-                     handlelength=2.0, columnspacing=2.4)
+    leg = fig.legend(handles=handles, loc="lower center", ncol=3, fontsize=5.8,
+                     frameon=False, bbox_to_anchor=(0.55, -0.06),
+                     handlelength=1.6, columnspacing=1.6)
     for text in leg.get_texts():
         text.set_color(INK_2)
 
-    fig.text(0.55, 1.005,
-             "Diagnosis is largely solvable; both prognostic tasks sit on chance",
-             ha="center", fontsize=11, color=INK, fontweight="bold")
-    fig.tight_layout(rect=[0, 0.02, 1, 0.95])
+    fig.tight_layout(rect=[0, 0.03, 1, 1.0])
 
-    out = os.path.join("results", "benchmark_overview.png")
-    os.makedirs("results", exist_ok=True)
+    out_dir = os.environ.get("IESSEEG_OUT", "results")
+    os.makedirs(out_dir, exist_ok=True)
+    out = os.path.join(out_dir, "fig_benchmark_overview.png")
     fig.savefig(out, dpi=300, bbox_inches="tight")
     fig.savefig(out.replace(".png", ".pdf"), bbox_inches="tight")
     print(f"figure -> {out}")
