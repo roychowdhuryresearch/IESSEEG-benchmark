@@ -49,10 +49,14 @@ deviation over the five folds.
 | `cbramod` | CBraMod | 19-ch TUEG | 30 s | [official checkpoint](https://github.com/wjq-learning/CBraMod) |
 | `luna` | LUNA-Base | 22-ch TCP bipolar | 30 s | [official checkpoint](https://huggingface.co/PulpBio/LUNA) |
 | `eegpt` | EEGPT | 19-ch referential | 4 s | [braindecode mirror](https://huggingface.co/braindecode/eegpt-pretrained) |
+| `reve` | REVE | 19-ch referential | 30 s | [official checkpoint](https://huggingface.co/brain-bzh/reve-base) |
+| `codebrain` | CodeBrain | 19-ch referential | 30 s | [official checkpoint](https://huggingface.co/YjMajy/CodeBrain) |
+| `csbrain` | CSBrain | 19-ch referential | 30 s | [official checkpoint](https://github.com/yuchen2199/CSBrain) |
 
-Foundation models are fine-tuned with their authors' recommended
-hyperparameters (see [`configs/baselines.yaml`](configs/baselines.yaml)),
-deliberately left untuned so the comparison measures out-of-the-box transfer
+Foundation models retain checkpoint-specific input contracts and use the
+single declared transfer recipe recorded in
+[`configs/baselines.yaml`](configs/baselines.yaml). The recipes are deliberately
+left untuned so the comparison measures one reproducible transfer setting
 rather than a per-task hyperparameter search.
 
 ## Setup
@@ -80,6 +84,8 @@ model's official repository into `IESSEEG_PRETRAINED_DIR`:
 | `labram-base.pth` | LaBraM |
 | `pretrained_weights.pth` | CBraMod |
 | `LUNA_base.safetensors` | LUNA |
+| `CodeBrain.pth` | CodeBrain |
+| `CSBrain.pth` | CSBrain |
 
 LUNA's weights are released under CC BY-ND 4.0, which permits fine-tuning
 for internal use but not redistribution of the fine-tuned weights. This
@@ -92,6 +98,11 @@ change the environment every other baseline was measured in. See
 [`baselines/eegpt/README.md`](baselines/eegpt/README.md); set
 `IESSEEG_PYTHON_EEGPT` to that interpreter, or skip the model with
 `MODELS="..."`.
+
+CodeBrain and CSBrain are kept as external source checkouts rather than copied
+into this repository. Clone their official repositories, set
+`IESSEEG_CODEBRAIN_ROOT` and `IESSEEG_CSBRAIN_ROOT`, and see the README in each
+baseline directory for the expected checkpoint and signal adaptation.
 
 ## Running
 

@@ -56,6 +56,8 @@ MODEL_DATA_SUBDIR = {
     # REVE is trained at 200 Hz, our native rate, and takes electrode
     # positions explicitly, so it consumes the referential tree as-is.
     "reve": "scalp_eeg_data_200HZ_np_format_labram",
+    "codebrain": "scalp_eeg_data_200HZ_np_format_labram",
+    "csbrain": "scalp_eeg_data_200HZ_np_format_labram",
 }
 
 # Which baselines/ directory holds each model's runner scripts. Two
@@ -71,6 +73,8 @@ MODEL_BASELINE_DIR = {
     "luna": "luna",
     "eegpt": "eegpt",
     "reve": "reve",
+    "codebrain": "codebrain",
+    "csbrain": "csbrain",
 }
 
 MODEL_TEST_SUBDIR = {
@@ -83,6 +87,8 @@ MODEL_TEST_SUBDIR = {
     "luna": "baseline_test",
     "eegpt": "labram_test",
     "reve": "labram_test",
+    "codebrain": "labram_test",
+    "csbrain": "labram_test",
 }
 
 N_FOLDS = 5

@@ -34,6 +34,8 @@ MODEL_RESULT_SUBDIR = {
     "luna": "luna/result/inference",
     "eegpt": "eegpt/result/inference",
     "reve": "reve/result/inference",
+    "codebrain": "codebrain/result/inference",
+    "csbrain": "csbrain/result/inference",
 }
 
 MODEL_DISPLAY = {
@@ -46,11 +48,16 @@ MODEL_DISPLAY = {
     "luna": "LUNA",
     "eegpt": "EEGPT",
     "reve": "REVE",
+    "codebrain": "CodeBrain",
+    "csbrain": "CSBrain",
 }
 
 # Row order used in the paper's tables: interpretable baselines first,
 # then from-scratch deep models, then pre-trained foundation models.
-MODEL_ORDER = ["handcrafted", "cnn_resnet", "cnn_vit", "biot", "labram", "cbramod", "luna", "eegpt", "reve"]
+MODEL_ORDER = [
+    "handcrafted", "cnn_resnet", "cnn_vit", "biot", "labram", "cbramod",
+    "luna", "eegpt", "reve", "codebrain", "csbrain",
+]
 
 TABLE_SPECS = {
     "case_control": dict(

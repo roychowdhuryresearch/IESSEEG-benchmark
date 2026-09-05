@@ -77,7 +77,7 @@ model_data_dir () {  # model -> preprocessed training tree
   case "$1" in
     handcrafted|cnn_resnet|cnn_vit|luna) subdir="scalp_eeg_data_200HZ_np_format" ;;
     biot)                           subdir="scalp_eeg_data_200HZ_np_format_biot" ;;
-    labram|eegpt|reve)              subdir="scalp_eeg_data_200HZ_np_format_labram" ;;
+    labram|eegpt|reve|codebrain|csbrain) subdir="scalp_eeg_data_200HZ_np_format_labram" ;;
     cbramod)                        subdir="scalp_eeg_data_200HZ_np_format_cbramod" ;;
     *) echo "model_data_dir: unknown model '$1'" >&2; return 1 ;;
   esac
@@ -89,7 +89,7 @@ model_test_dir () {  # model -> Routine-Clip evaluation tree
   case "$1" in
     handcrafted|cnn_resnet|cnn_vit|luna) subdir="baseline_test" ;;
     biot)                           subdir="biot_test" ;;
-    labram|eegpt|reve)              subdir="labram_test" ;;
+    labram|eegpt|reve|codebrain|csbrain) subdir="labram_test" ;;
     cbramod)                        subdir="cbramod_test" ;;
     *) echo "model_test_dir: unknown model '$1'" >&2; return 1 ;;
   esac
@@ -138,6 +138,7 @@ for_each_task_fold () {
   local body="$1"
   local task fold label_key gpu
   local tasks=()
+  local folds=()
 
   # Task selection, in order of precedence: a TASKS array set by the
   # calling script, then the IESSEEG_TASKS environment variable (a
@@ -151,9 +152,21 @@ for_each_task_fold () {
     tasks=("${TASKS_DEFAULT[@]}")
   fi
 
+  if [ -n "${IESSEEG_FOLDS:-}" ]; then
+    read -r -a folds <<< "${IESSEEG_FOLDS}"
+  else
+    for ((fold = 0; fold < N_FOLDS; fold++)); do
+      folds+=("${fold}")
+    done
+  fi
+
   for task in "${tasks[@]}"; do
     label_key="$(label_key_for "${task}")"
-    for ((fold = 0; fold < N_FOLDS; fold++)); do
+    for fold in "${folds[@]}"; do
+      if ! [[ "${fold}" =~ ^[0-9]+$ ]] || [ "${fold}" -ge "${N_FOLDS}" ]; then
+        echo "for_each_task_fold: invalid fold '${fold}' for N_FOLDS=${N_FOLDS}" >&2
+        return 1
+      fi
       gpu="$(pick_gpu)"
       echo
       echo "################################################################"

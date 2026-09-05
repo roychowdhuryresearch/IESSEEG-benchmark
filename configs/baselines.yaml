@@ -6,8 +6,8 @@
 # scripts/ read them, so changing a number here changes the experiment
 # rather than only the documentation.
 #
-# For the three foundation models the fine-tuning hyperparameters are the
-# authors' own recommended defaults, deliberately left unchanged: tuning
+# For the foundation models the fine-tuning hyperparameters follow the
+# authors' recommended defaults where applicable, deliberately left unchanged: tuning
 # them per task would make the comparison a hyperparameter search rather
 # than an out-of-the-box transfer measurement.
 
@@ -141,3 +141,37 @@ models:
     # Needs braindecode >= 1.3, newer than the rest of the benchmark pins,
     # so it runs from its own interpreter (IESSEEG_PYTHON_EEGPT).
     separate_environment: true
+
+  codebrain:
+    display_name: CodeBrain
+    data_subdir: scalp_eeg_data_200HZ_np_format_labram
+    test_subdir: labram_test
+    montage: 19-channel referential 10-20
+    checkpoint: CodeBrain.pth
+    sample_rate: 200
+    window_sec: 30
+    window_transform: patch
+    signal_scale: microvolts / 100
+    head: mean pooling plus binary linear classifier
+    epochs: 50
+    batch_size: 32
+    lr: 1.0e-4
+    weight_decay: 5.0e-4
+    patience: 8
+
+  csbrain:
+    display_name: CSBrain
+    data_subdir: scalp_eeg_data_200HZ_np_format_labram
+    test_subdir: labram_test
+    montage: 19-channel referential 10-20 with anatomical region ordering
+    checkpoint: CSBrain.pth
+    sample_rate: 200
+    window_sec: 30
+    window_transform: patch
+    signal_scale: microvolts / 100
+    head: mean pooling plus binary linear classifier
+    epochs: 50
+    batch_size: 32
+    lr: 1.0e-4
+    weight_decay: 5.0e-2
+    patience: 8
