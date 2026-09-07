@@ -2,8 +2,8 @@
 
 Reference baselines for **IESSEEG**, a public pre-treatment EEG dataset for
 Infantile Epileptic Spasms Syndrome (IESS): 266.9 hours of recordings from
-100 infants (50 IESS cases, 50 age-matched controls), with awake and sleep
-segments.
+100 infants (50 IESS cases, 25 young clinical-mimic controls, and 25
+additional older healthy controls), with awake and sleep segments.
 
 - Dataset: https://huggingface.co/datasets/roychowdhuryresearch/IESSEEG (CC BY 4.0)
 - Preprocessing toolkit: https://github.com/roychowdhuryresearch/IESSEEG-toolbox
@@ -14,9 +14,11 @@ segments.
 |---|---|---|---|
 | 1 | Infantile Spasm Diagnosis | 100 | case vs. control |
 | 2 | Immediate Treatment Response Prediction | 50 cases | responder vs. non-responder within two weeks |
-| 3 | Sustained Treatment Response Prediction | 50 cases | relapse-free for at least four weeks |
+| 3 | Sustained Treatment Response Prediction | 50 cases | early response sustained through one month |
 
-All three are binary classification over 30-minute interictal clips.
+The sustained-response negative group contains 18 immediate failures and four
+initial responders who later relapsed; it is not a relapse-prediction task.
+All three tasks are evaluated on separately sampled 30-minute interictal clips.
 
 ## Evaluation protocol
 
@@ -170,13 +172,13 @@ and `iesseeg/evaluation/aggregate.py`.
 ## Citation
 
 ```bibtex
-@inproceedings{lu2025iesseeg,
-  title  = {IESSEEG: A Public EEG Benchmark for Diagnosis and Treatment
-            Response Prediction in Infantile Epileptic Spasms Syndrome},
+@inproceedings{lu2026iesseeg,
+  title  = {IESSEEG: A Long-Recording EEG Benchmark Across Clinical Label
+            Scales},
   author = {Lu, Mingjian and Zhang, Yipeng and Daida, Atsuro and Kanai, Sotaro
             and Rajaraman, Rajsekar and Nariai, Hiroki and Oana, Shingo
             and Hussain, Shaun A. and Roychowdhury, Vwani},
-  year   = {2025}
+  year   = {2026}
 }
 ```
 
