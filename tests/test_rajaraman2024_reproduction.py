@@ -33,6 +33,9 @@ clip_analysis = load_script(
     "response_feature_analysis", "analyze_response_feature_associations.py"
 )
 full_grid = load_script("full_qeeg_response_grid", "analyze_full_qeeg_response_grid.py")
+derived_metrics = load_script(
+    "paper_derived_response_metrics", "analyze_paper_derived_response_metrics.py"
+)
 
 
 def synthetic_metadata() -> pd.DataFrame:
@@ -212,3 +215,28 @@ def test_full_qeeg_grid_contains_every_cell_and_both_aggregations(tmp_path):
     assert sum(d["source_selected_cell"] for d in designs.values()) == 8
     assert all(len(table) in {50, 100} for table in tables.values())
     assert all(table.patient_id.nunique() == 50 for table in tables.values())
+
+    derived_tables, derived_designs = derived_metrics.build_derived_tables(tables)
+    assert len(derived_tables) == 16
+    assert len(derived_designs) == 16
+    np.testing.assert_allclose(
+        derived_tables["r0_patient"].value,
+        -2.361 * (-0.2 + 0.01 * np.arange(50)) - 0.051 * (4.0 + 0.1 * np.arange(50)),
+    )
+    assert (
+        derived_designs["rho_patient"]["source_target"]
+        == "relapse time among immediate responders"
+    )
+
+    grid_summary = full_grid.summarize_endpoint(
+        "sustained", tables, designs, n_permutations=99, seed=1
+    )
+    derived_summary = derived_metrics.summarize_endpoint(
+        "sustained", derived_tables, derived_designs, n_permutations=99, seed=2
+    )
+    catalog = derived_metrics.build_complete_catalog(grid_summary, derived_summary)
+    assert len(catalog) == 40
+    assert set(catalog.adjustment_family) == {
+        "24 individual-feature tests within endpoint",
+        "16 paper-derived tests within endpoint",
+    }

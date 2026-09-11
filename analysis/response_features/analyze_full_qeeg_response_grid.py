@@ -104,7 +104,12 @@ def load_feature_grid(
             )
         condition = str(row.pre_post_treatment_label)
         state = str(row.sleep_awake_label)
-        common = {"patient_id": int(row.patient_id), "label": int(row.label)}
+        common = {
+            "patient_id": int(row.patient_id),
+            "recording_id": row.recording_id,
+            "duration_category": float(row.LeadtimeUKISS),
+            "label": int(row.label),
+        }
         for feature, _ in FEATURES:
             name = table_name(condition, state, feature, "single_clip")
             values[name].append({**common, "value": float(payload[feature])})
@@ -120,7 +125,9 @@ def load_feature_grid(
         tables[name] = table
         mean_name = name.replace("__single_clip", "__patient_average")
         tables[mean_name] = table.groupby("patient_id", as_index=False).agg(
-            label=("label", "first"), value=("value", "mean")
+            label=("label", "first"),
+            duration_category=("duration_category", "first"),
+            value=("value", "mean"),
         )
     return tables, designs
 

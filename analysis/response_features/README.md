@@ -98,6 +98,37 @@ marked in the output so they are not confused with the newly examined cells.
 The executed notebook is
 [`notebooks/full_qeeg_response_grid.ipynb`](notebooks/full_qeeg_response_grid.ipynb).
 
+The same notebook and the complete catalog also include every paper-defined
+derived quantity supported by these reproduced features:
+
+- `R0`, the PRE awake DFA/PLI EEG score;
+- `P0`, the published duration-adjusted probability based on R0;
+- `R1`, the POST awake-DFA/sleep-entropy EEG score;
+- `P1`, the published duration-adjusted probability based on POST features;
+- the three corresponding PRE-to-POST feature changes; and
+- `rho`, which the paper defined for relapse time rather than response.
+
+Regenerate the derived table and the combined 80-row catalog with:
+
+```bash
+python analysis/response_features/analyze_paper_derived_response_metrics.py \
+  --metadata-csv /path/to/local_clip_metadata.csv \
+  --raw-features-dir local_results/rajaraman2024/raw_features
+```
+
+The catalog names the original target and construction for every row. It uses
+separate, labeled Holm families for the 24 individual-feature tests and the 16
+paper-derived tests within each response endpoint.
+
+`P0` and `P1` are not EEG-only quantities because both include the published
+treatment-duration category. The paper did not define a combined PRE-plus-POST
+response score. It defined `rho` for relapse time among immediate responders,
+so the catalog reports its binary-response association only as an explicitly
+marked exploratory calculation. The locally reproduced entropy has a constant
+absolute offset from the article's reported values; consequently, `P1` can be
+compared by ranking/AUROC here, but its numerical probability is not treated as
+calibrated.
+
 See [`../../docs/rajaraman2024-reproduction.md`](../../docs/rajaraman2024-reproduction.md)
 for the method correspondence, numerical findings, and limitations.
 
