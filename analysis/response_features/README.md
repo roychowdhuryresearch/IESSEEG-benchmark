@@ -72,6 +72,32 @@ correction across the eight inspected quantities within each endpoint.
 The executed, reader-oriented version is
 [`notebooks/clip_and_state_response_associations.ipynb`](notebooks/clip_and_state_response_associations.ipynb).
 
+## Complete condition/state/feature grid
+
+The source reproduction intentionally contains only the four qEEG cells used
+by the published R0 and R1 scores. To examine the omitted combinations, extract
+DFA, entropy, and raw PLI for every PRE/POST and awake/sleep clip:
+
+```bash
+CUDA_VISIBLE_DEVICES=3 python analysis/response_features/extract_rajaraman2024_raw_features.py \
+  --features all --cell-scope all --n-surrogates 0 \
+  --metadata-csv /path/to/local_clip_metadata.csv \
+  --edf-dir /path/to/clinical_clip_edfs
+
+python analysis/response_features/analyze_full_qeeg_response_grid.py \
+  --metadata-csv /path/to/local_clip_metadata.csv \
+  --raw-features-dir local_results/rajaraman2024/raw_features
+```
+
+This produces 24 tests per response endpoint: 12 condition/state/feature cells
+evaluated once per clip and after averaging the two matching clips per patient.
+The permutation test preserves patient membership, and Holm correction covers
+all 24 tests within each endpoint. Surrogate diagnostics are unnecessary for
+the raw-PLI grid, hence `--n-surrogates 0`. The source-selected cells remain
+marked in the output so they are not confused with the newly examined cells.
+The executed notebook is
+[`notebooks/full_qeeg_response_grid.ipynb`](notebooks/full_qeeg_response_grid.ipynb).
+
 See [`../../docs/rajaraman2024-reproduction.md`](../../docs/rajaraman2024-reproduction.md)
 for the method correspondence, numerical findings, and limitations.
 

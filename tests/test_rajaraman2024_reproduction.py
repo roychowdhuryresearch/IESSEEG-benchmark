@@ -32,6 +32,7 @@ reproduce = load_script("rajaraman_reproduce", "reproduce_rajaraman2024.py")
 clip_analysis = load_script(
     "response_feature_analysis", "analyze_response_feature_associations.py"
 )
+full_grid = load_script("full_qeeg_response_grid", "analyze_full_qeeg_response_grid.py")
 
 
 def synthetic_metadata() -> pd.DataFrame:
@@ -64,6 +65,9 @@ def test_target_rows_match_the_three_required_clip_cells():
     assert len(extract.target_rows(metadata, "beta")) == 300
     assert len(extract.target_rows(metadata, "pli")) == 100
     assert len(extract.target_rows(metadata, "all")) == 300
+    assert len(extract.target_rows(metadata, "beta", cell_scope="all")) == 400
+    assert len(extract.target_rows(metadata, "pli", cell_scope="all")) == 400
+    assert len(extract.target_rows(metadata, "all", cell_scope="all")) == 400
 
 
 def test_matlab_hist_entropy_handles_constant_and_balanced_signals():
@@ -77,7 +81,22 @@ def test_contiguous_clean_epochs_never_join_across_artifact_gaps():
     seconds = 14
     data = np.arange(seconds * fs, dtype=float)[None, :]
     clean = np.array(
-        [True, True, True, True, False, True, True, True, True, True, True, True, False, False]
+        [
+            True,
+            True,
+            True,
+            True,
+            False,
+            True,
+            True,
+            True,
+            True,
+            True,
+            True,
+            True,
+            False,
+            False,
+        ]
     )
 
     epochs = extract.contiguous_clean_epochs(data, clean, fs, epoch_seconds=4)
@@ -107,7 +126,9 @@ def test_fast_fluctuation_function_matches_direct_linear_detrending():
         deviations = []
         for start in range(0, len(profile) - width, max(1, round(width * 0.5))):
             segment = profile[start : start + width + 1]
-            fitted = np.polyval(np.polyfit(np.arange(width + 1), segment, 1), np.arange(width + 1))
+            fitted = np.polyval(
+                np.polyfit(np.arange(width + 1), segment, 1), np.arange(width + 1)
+            )
             deviations.append(np.sqrt(np.mean((segment - fitted) ** 2)))
         expected.append(np.median(deviations))
     np.testing.assert_allclose(observed, expected, rtol=1e-11, atol=1e-11)
@@ -121,9 +142,9 @@ def test_raw_feature_loader_averages_two_clips_per_patient(tmp_path):
     metadata.to_csv(metadata_path, index=False)
 
     for row in metadata.itertuples(index=False):
-        target = (row.pre_post_treatment_label == "PRE" and row.sleep_awake_label == "AWAKE") or (
-            row.pre_post_treatment_label == "POST"
-        )
+        target = (
+            row.pre_post_treatment_label == "PRE" and row.sleep_awake_label == "AWAKE"
+        ) or (row.pre_post_treatment_label == "POST")
         if not target:
             continue
         payload = {"clean_fraction": 0.9}
@@ -161,3 +182,33 @@ def test_clip_auc_and_holm_adjustment():
     np.testing.assert_allclose(
         clip_analysis.holm_adjust([0.01, 0.04, 0.03]), [0.03, 0.06, 0.06]
     )
+
+
+def test_full_qeeg_grid_contains_every_cell_and_both_aggregations(tmp_path):
+    metadata = synthetic_metadata()
+    metadata_path = tmp_path / "metadata.csv"
+    feature_dir = tmp_path / "features"
+    feature_dir.mkdir()
+    metadata.to_csv(metadata_path, index=False)
+
+    for row in metadata.itertuples(index=False):
+        payload = {
+            "beta_dfa_intercept_mean": -0.2 + 0.01 * row.patient_id,
+            "beta_entropy_mean": 6.0 + 0.01 * row.patient_id,
+            "connectivity_percent_raw_pli": 4.0 + 0.1 * row.patient_id,
+            "pli_epoch_policy": extract.PLI_EPOCH_POLICY,
+            "pli_connectivity_policy": extract.PLI_CONNECTIVITY_POLICY,
+        }
+        (feature_dir / f"{row.short_recording_id}.json").write_text(
+            __import__("json").dumps(payload), encoding="utf-8"
+        )
+
+    tables, designs = full_grid.load_feature_grid(
+        feature_dir, metadata_path, "meaningful_responder"
+    )
+
+    assert len(tables) == 24
+    assert len(designs) == 24
+    assert sum(d["source_selected_cell"] for d in designs.values()) == 8
+    assert all(len(table) in {50, 100} for table in tables.values())
+    assert all(table.patient_id.nunique() == 50 for table in tables.values())

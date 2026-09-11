@@ -17,10 +17,12 @@ are not present in the released project data, so this script can reproduce the
 automatic portion of preprocessing but cannot be an exact bitwise recreation
 of the source analysis.
 
-PLI is expensive.  It is computed on CUDA and the program exits if CUDA is not
-available.  DFA and entropy can be extracted separately on CPU with
-``--features beta``.  Each clip is cached as a small JSON file so interrupted
-runs resume without recomputing completed clips.
+With ``--cell-scope all``, the same three feature definitions are computed for
+all PRE/POST and awake/sleep cells as an exploratory complete grid. PLI is
+computed on CUDA and the program exits if CUDA is unavailable. DFA and entropy
+can be extracted separately on CPU with ``--features beta``. Each clip is
+cached as a small JSON file so interrupted runs resume without recomputing
+completed clips.
 """
 
 from __future__ import annotations
@@ -50,8 +52,25 @@ REPO = HERE.parents[1]
 LOCAL_RESULTS = REPO / "local_results" / "rajaraman2024"
 
 SCALP = [
-    "FP1", "FP2", "F3", "F4", "C3", "C4", "P3", "P4", "O1", "O2",
-    "F7", "F8", "T3", "T4", "T5", "T6", "FZ", "CZ", "PZ",
+    "FP1",
+    "FP2",
+    "F3",
+    "F4",
+    "C3",
+    "C4",
+    "P3",
+    "P4",
+    "O1",
+    "O2",
+    "F7",
+    "F8",
+    "T3",
+    "T4",
+    "T5",
+    "T6",
+    "FZ",
+    "CZ",
+    "PZ",
 ]
 
 
@@ -68,12 +87,16 @@ def canonical_channel(name: str) -> str:
 
 
 def find_channel(ch_names: list[str], target: str) -> int:
-    matches = [i for i, name in enumerate(ch_names) if canonical_channel(name) == target]
+    matches = [
+        i for i, name in enumerate(ch_names) if canonical_channel(name) == target
+    ]
     eeg_matches = [i for i in matches if ch_names[i].upper().startswith("EEG ")]
     if len(eeg_matches) == 1:
         return eeg_matches[0]
     if len(matches) != 1:
-        raise ValueError(f"Expected one {target} channel, found {[ch_names[i] for i in matches]}")
+        raise ValueError(
+            f"Expected one {target} channel, found {[ch_names[i] for i in matches]}"
+        )
     return matches[0]
 
 
@@ -81,9 +104,15 @@ def resolve_edf(edf_dir: Path, recording_id: str) -> Path:
     direct = edf_dir / f"{recording_id}.edf"
     if direct.exists():
         return direct
-    matches = [path for path in edf_dir.glob("*.edf") if path.stem.casefold() == recording_id.casefold()]
+    matches = [
+        path
+        for path in edf_dir.glob("*.edf")
+        if path.stem.casefold() == recording_id.casefold()
+    ]
     if len(matches) != 1:
-        raise FileNotFoundError(f"Expected one case-insensitive EDF match for {recording_id}: {matches}")
+        raise FileNotFoundError(
+            f"Expected one case-insensitive EDF match for {recording_id}: {matches}"
+        )
     return matches[0]
 
 
@@ -102,7 +131,9 @@ def load_edf_microvolts(path: Path) -> tuple[np.ndarray, np.ndarray, float, floa
         source_int = int(round(source_fs))
         analysis_int = int(round(analysis_fs))
         if not math.isclose(source_fs, source_int):
-            raise ValueError(f"{path.name}: unsupported non-integer sampling rate {source_fs}")
+            raise ValueError(
+                f"{path.name}: unsupported non-integer sampling rate {source_fs}"
+            )
         divisor = math.gcd(source_int, analysis_int)
         up, down = analysis_int // divisor, source_int // divisor
         scalp_uv = resample_poly(scalp_uv, up, down, axis=1)
@@ -134,7 +165,9 @@ def matlab_firls_approximation(kind: str, fs: float) -> np.ndarray:
     return firls(scipy_taps, bands, desired)
 
 
-def automated_clean_seconds(scalp_uv: np.ndarray, ears_uv: np.ndarray, fs: int) -> np.ndarray:
+def automated_clean_seconds(
+    scalp_uv: np.ndarray, ears_uv: np.ndarray, fs: int
+) -> np.ndarray:
     """Reproduce the published automatic extreme-value artifact detector."""
     ear_mean = ears_uv.mean(axis=0, keepdims=True)
     linked_ear_21 = np.concatenate([scalp_uv, ears_uv], axis=0) - ear_mean
@@ -166,11 +199,15 @@ def automated_clean_seconds(scalp_uv: np.ndarray, ears_uv: np.ndarray, fs: int) 
     artifact_samples = extreme | impedance
 
     n_seconds = scalp_uv.shape[1] // fs
-    artifact_seconds = artifact_samples[: n_seconds * fs].reshape(n_seconds, fs).any(axis=1)
+    artifact_seconds = (
+        artifact_samples[: n_seconds * fs].reshape(n_seconds, fs).any(axis=1)
+    )
     return ~artifact_seconds
 
 
-def concatenate_clean_seconds(data: np.ndarray, clean_seconds: np.ndarray, fs: int) -> np.ndarray:
+def concatenate_clean_seconds(
+    data: np.ndarray, clean_seconds: np.ndarray, fs: int
+) -> np.ndarray:
     n_seconds = len(clean_seconds)
     blocks = data[:, : n_seconds * fs].reshape(data.shape[0], n_seconds, fs)
     return blocks[:, clean_seconds].reshape(data.shape[0], -1)
@@ -267,14 +304,18 @@ def dfa_intercept(signal: np.ndarray, fs: int) -> np.ndarray:
     for channel in range(signal.shape[0]):
         fluctuation = fluctuation_function(envelope[channel], windows)
         valid = np.isfinite(fluctuation) & (fluctuation > 0)
-        output[channel] = np.polyfit(np.log10(windows[valid]), np.log10(fluctuation[valid]), 1)[1]
+        output[channel] = np.polyfit(
+            np.log10(windows[valid]), np.log10(fluctuation[valid]), 1
+        )[1]
     return output
 
 
 def pli_matrix_from_phase_torch(phase, torch):
     """PLI matrices for phase shaped (batch, channels, time)."""
     batch, channels, _ = phase.shape
-    output = torch.zeros((batch, channels, channels), device=phase.device, dtype=torch.float32)
+    output = torch.zeros(
+        (batch, channels, channels), device=phase.device, dtype=torch.float32
+    )
     for first in range(channels):
         differences = phase[:, first : first + 1, :] - phase[:, first + 1 :, :]
         values = torch.abs(torch.sign(torch.sin(differences)).mean(dim=-1))
@@ -322,8 +363,8 @@ def gpu_pli_connectivity(
     generator = torch.Generator(device=device)
     generator.manual_seed(seed)
     raw_sum = torch.zeros((19, 19), device=device)
-    retained_sum = torch.zeros((19, 19), device=device)
-    significant_sum = torch.zeros((19, 19), device=device)
+    retained_sum = torch.zeros((19, 19), device=device) if n_surrogates > 0 else None
+    significant_sum = torch.zeros((19, 19), device=device) if n_surrogates > 0 else None
 
     for epoch_np in epochs:
         epoch = torch.as_tensor(epoch_np, device=device)
@@ -331,25 +372,36 @@ def gpu_pli_connectivity(
         observed = pli_matrix_from_phase_torch(observed_phase, torch)[0]
         raw_sum += observed
 
-        spectrum = torch.fft.rfft(epoch, dim=-1)
-        magnitude = torch.abs(spectrum)[None, ...]
-        random_phase = 2.0 * torch.pi * torch.rand(
-            (n_surrogates, 19, spectrum.shape[-1]), generator=generator, device=device
-        )
-        random_phase[..., 0] = torch.angle(spectrum[:, 0])[None, :]
-        if epoch_samples % 2 == 0:
-            random_phase[..., -1] = torch.angle(spectrum[:, -1])[None, :]
-        randomized = torch.fft.irfft(magnitude * torch.exp(1j * random_phase), n=epoch_samples, dim=-1)
-        surrogate = pli_matrix_from_phase_torch(analytic_phase_torch(randomized, torch), torch)
-        threshold = torch.quantile(surrogate, 0.95, dim=0)
-        significant = observed > threshold
-        retained_sum += observed * significant
-        significant_sum += significant
+        if n_surrogates > 0:
+            spectrum = torch.fft.rfft(epoch, dim=-1)
+            magnitude = torch.abs(spectrum)[None, ...]
+            random_phase = (
+                2.0
+                * torch.pi
+                * torch.rand(
+                    (n_surrogates, 19, spectrum.shape[-1]),
+                    generator=generator,
+                    device=device,
+                )
+            )
+            random_phase[..., 0] = torch.angle(spectrum[:, 0])[None, :]
+            if epoch_samples % 2 == 0:
+                random_phase[..., -1] = torch.angle(spectrum[:, -1])[None, :]
+            randomized = torch.fft.irfft(
+                magnitude * torch.exp(1j * random_phase),
+                n=epoch_samples,
+                dim=-1,
+            )
+            surrogate = pli_matrix_from_phase_torch(
+                analytic_phase_torch(randomized, torch), torch
+            )
+            threshold = torch.quantile(surrogate, 0.95, dim=0)
+            significant = observed > threshold
+            retained_sum += observed * significant
+            significant_sum += significant
 
     pair = torch.triu_indices(19, 19, offset=1, device=device)
     raw_network = raw_sum / n_epochs
-    retained_network = retained_sum / n_epochs
-    frequency_network = significant_sum / n_epochs
     result = {
         "pli_n_clean_8s_epochs": int(n_epochs),
         # Rajaraman et al.'s C0: average epoch PLI for every electrode pair,
@@ -358,20 +410,36 @@ def gpu_pli_connectivity(
         "connectivity_percent_raw_pli": float(
             100.0 * (raw_network[pair[0], pair[1]] > 0.20).float().mean().item()
         ),
-        # Smith et al.'s surrogate-threshold wording, retained as a diagnostic.
-        "connectivity_percent_retained_pli": float(
-            100.0 * (retained_network[pair[0], pair[1]] > 0.20).float().mean().item()
-        ),
-        # Sensitivity reading: each significant edge is binary before the
-        # epoch average, making the network value a detection frequency.
-        "connectivity_percent_significance_frequency": float(
-            100.0 * (frequency_network[pair[0], pair[1]] > 0.20).float().mean().item()
-        ),
     }
+    if n_surrogates > 0:
+        retained_network = retained_sum / n_epochs
+        frequency_network = significant_sum / n_epochs
+        result.update(
+            {
+                # Smith et al.'s surrogate-threshold wording, retained as a diagnostic.
+                "connectivity_percent_retained_pli": float(
+                    100.0
+                    * (retained_network[pair[0], pair[1]] > 0.20).float().mean().item()
+                ),
+                # Sensitivity reading: each significant edge is binary before the
+                # epoch average, making the network value a detection frequency.
+                "connectivity_percent_significance_frequency": float(
+                    100.0
+                    * (frequency_network[pair[0], pair[1]] > 0.20).float().mean().item()
+                ),
+            }
+        )
     return result
 
 
-def extract_one(row, edf_dir: Path, feature_set: str, n_surrogates: int, seed: int) -> dict[str, object]:
+def extract_one(
+    row,
+    edf_dir: Path,
+    feature_set: str,
+    n_surrogates: int,
+    seed: int,
+    cell_scope: str = "source",
+) -> dict[str, object]:
     recording_id = normalize_recording_id(row.short_recording_id)
     edf_path = resolve_edf(edf_dir, recording_id)
     scalp_uv, ears_uv, fs_float, source_fs = load_edf_microvolts(edf_path)
@@ -400,41 +468,55 @@ def extract_one(row, edf_dir: Path, feature_set: str, n_surrogates: int, seed: i
     }
 
     needs_beta = (
-        row.pre_post_treatment_label == "PRE" and row.sleep_awake_label == "AWAKE"
-    ) or (
-        row.pre_post_treatment_label == "POST"
-        and row.sleep_awake_label in {"AWAKE", "SLEEP"}
+        cell_scope == "all"
+        or (row.pre_post_treatment_label == "PRE" and row.sleep_awake_label == "AWAKE")
+        or (
+            row.pre_post_treatment_label == "POST"
+            and row.sleep_awake_label in {"AWAKE", "SLEEP"}
+        )
     )
     if feature_set in {"beta", "all"} and needs_beta:
-        beta = filtfilt(matlab_firls_approximation("beta", fs), [1.0], linked_ear, axis=1)
+        beta = filtfilt(
+            matlab_firls_approximation("beta", fs), [1.0], linked_ear, axis=1
+        )
         clean_beta = concatenate_clean_seconds(beta, clean_seconds, fs)
-        if row.sleep_awake_label == "AWAKE":
+        if cell_scope == "all" or row.sleep_awake_label == "AWAKE":
             channel_dfa = dfa_intercept(clean_beta, fs)
             output["beta_dfa_intercept_channels"] = channel_dfa.tolist()
             output["beta_dfa_intercept_mean"] = float(np.mean(channel_dfa))
-        if row.pre_post_treatment_label == "POST" and row.sleep_awake_label == "SLEEP":
+        if cell_scope == "all" or (
+            row.pre_post_treatment_label == "POST" and row.sleep_awake_label == "SLEEP"
+        ):
             channel_entropy = matlab_hist_entropy(clean_beta, bins=350)
             output["beta_entropy_channels"] = channel_entropy.tolist()
             output["beta_entropy_mean"] = float(np.mean(channel_entropy))
 
-    needs_pli = row.pre_post_treatment_label == "PRE" and row.sleep_awake_label == "AWAKE"
+    needs_pli = cell_scope == "all" or (
+        row.pre_post_treatment_label == "PRE" and row.sleep_awake_label == "AWAKE"
+    )
     if feature_set in {"pli", "all"} and needs_pli:
         car = scalp_uv - scalp_uv.mean(axis=0, keepdims=True)
         delta = filtfilt(matlab_firls_approximation("delta", fs), [1.0], car, axis=1)
-        clean_epochs = contiguous_clean_epochs(delta, clean_seconds, fs, epoch_seconds=8)
+        clean_epochs = contiguous_clean_epochs(
+            delta, clean_seconds, fs, epoch_seconds=8
+        )
         output.update(gpu_pli_connectivity(clean_epochs, fs, n_surrogates, seed))
-        output["pli_surrogates_per_epoch"] = int(n_surrogates)
+        if n_surrogates > 0:
+            output["pli_surrogates_per_epoch"] = int(n_surrogates)
         output["pli_epoch_policy"] = PLI_EPOCH_POLICY
         output["pli_connectivity_policy"] = PLI_CONNECTIVITY_POLICY
     return output
 
 
-def target_rows(metadata: pd.DataFrame, feature_set: str) -> pd.DataFrame:
+def target_rows(
+    metadata: pd.DataFrame, feature_set: str, cell_scope: str = "source"
+) -> pd.DataFrame:
     cases = metadata.loc[metadata.case_control_label.eq("CASE")].copy()
+    if cell_scope == "all":
+        return cases
     beta = (
-        (cases.pre_post_treatment_label.eq("PRE") & cases.sleep_awake_label.eq("AWAKE"))
-        | cases.pre_post_treatment_label.eq("POST")
-    )
+        cases.pre_post_treatment_label.eq("PRE") & cases.sleep_awake_label.eq("AWAKE")
+    ) | cases.pre_post_treatment_label.eq("POST")
     pli = cases.pre_post_treatment_label.eq("PRE") & cases.sleep_awake_label.eq("AWAKE")
     if feature_set == "beta":
         return cases.loc[beta]
@@ -446,6 +528,12 @@ def target_rows(metadata: pd.DataFrame, feature_set: str) -> pd.DataFrame:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--features", choices=["beta", "pli", "all"], default="all")
+    parser.add_argument(
+        "--cell-scope",
+        choices=["source", "all"],
+        default="source",
+        help="Use source-selected cells or compute a complete PRE/POST by awake/sleep grid.",
+    )
     parser.add_argument("--n-surrogates", type=int, default=100)
     parser.add_argument("--seed", type=int, default=202409)
     parser.add_argument("--limit", type=int)
@@ -471,8 +559,8 @@ def main() -> None:
         default=LOCAL_RESULTS / "raw_features",
     )
     args = parser.parse_args()
-    if args.n_surrogates < 1:
-        raise ValueError("--n-surrogates must be positive")
+    if args.n_surrogates < 0:
+        raise ValueError("--n-surrogates must be non-negative")
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
     if not args.metadata_csv.is_file():
@@ -481,10 +569,13 @@ def main() -> None:
         raise NotADirectoryError(args.edf_dir)
 
     metadata = pd.read_csv(args.metadata_csv)
-    rows = target_rows(metadata, args.features)
+    rows = target_rows(metadata, args.features, args.cell_scope)
     if args.limit is not None:
         rows = rows.iloc[: args.limit]
-    print(f"Target clips: {len(rows)} ({args.features}); output: {args.output_dir}", flush=True)
+    print(
+        f"Target clips: {len(rows)} ({args.features}); output: {args.output_dir}",
+        flush=True,
+    )
 
     for position, row in enumerate(rows.itertuples(index=False), start=1):
         recording_id = normalize_recording_id(row.short_recording_id)
@@ -492,19 +583,44 @@ def main() -> None:
         existing: dict[str, object] = {}
         if path.exists():
             existing = json.loads(path.read_text(encoding="utf-8"))
-        beta_done = "beta_dfa_intercept_mean" in existing or "beta_entropy_mean" in existing
-        pli_done = (
+        requires_dfa = args.cell_scope == "all" or row.sleep_awake_label == "AWAKE"
+        requires_entropy = args.cell_scope == "all" or (
+            row.pre_post_treatment_label == "POST" and row.sleep_awake_label == "SLEEP"
+        )
+        beta_done = (not requires_dfa or "beta_dfa_intercept_mean" in existing) and (
+            not requires_entropy or "beta_entropy_mean" in existing
+        )
+        requires_pli = args.cell_scope == "all" or (
+            row.pre_post_treatment_label == "PRE" and row.sleep_awake_label == "AWAKE"
+        )
+        pli_done = not requires_pli or (
             "connectivity_percent_raw_pli" in existing
             and existing.get("pli_epoch_policy") == PLI_EPOCH_POLICY
             and existing.get("pli_connectivity_policy") == PLI_CONNECTIVITY_POLICY
+            and (
+                args.n_surrogates == 0
+                or (
+                    "connectivity_percent_retained_pli" in existing
+                    and "connectivity_percent_significance_frequency" in existing
+                )
+            )
         )
-        if (args.features == "beta" and beta_done) or (args.features == "pli" and pli_done) or (
-            args.features == "all" and beta_done and (pli_done or row.pre_post_treatment_label != "PRE" or row.sleep_awake_label != "AWAKE")
+        if (
+            (args.features == "beta" and beta_done)
+            or (args.features == "pli" and pli_done)
+            or (args.features == "all" and beta_done and pli_done)
         ):
             print(f"[{position}/{len(rows)}] {recording_id}: cached", flush=True)
             continue
         print(f"[{position}/{len(rows)}] {recording_id}: extracting", flush=True)
-        result = extract_one(row, args.edf_dir, args.features, args.n_surrogates, args.seed + position)
+        result = extract_one(
+            row,
+            args.edf_dir,
+            args.features,
+            args.n_surrogates,
+            args.seed + position,
+            args.cell_scope,
+        )
         existing.update(result)
         path.write_text(json.dumps(existing, indent=2) + "\n", encoding="utf-8")
 
