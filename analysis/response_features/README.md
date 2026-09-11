@@ -46,6 +46,22 @@ The final script averages the two matching clips for each patient and writes
 the distribution and score comparisons. The reviewed, de-identified aggregate
 tables from the completed run are in `reference_results/`.
 
+To test the source quantities before averaging each patient's two clips:
+
+```bash
+python analysis/response_features/analyze_rajaraman2024_clip_associations.py \
+  --metadata-csv /path/to/local_clip_metadata.csv \
+  --raw-features-dir local_results/rajaraman2024/raw_features
+```
+
+This analysis computes an AUROC over the 100 individual clips in each relevant
+condition/state cell. Its significance test shuffles labels across the 50
+patients while always keeping the two clips from one patient together. The
+committed table reports the resulting patient-clustered permutation P-values
+and Holm correction across the five inspected quantities. A complete POST
+score is not reported per clip because it combines separate awake and sleep
+clips.
+
 See [`../../docs/rajaraman2024-reproduction.md`](../../docs/rajaraman2024-reproduction.md)
 for the method correspondence, numerical findings, and limitations.
 

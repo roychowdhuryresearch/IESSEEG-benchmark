@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import importlib.util
 from pathlib import Path
+import sys
 
 import numpy as np
 import pandas as pd
@@ -27,6 +28,10 @@ def load_script(name: str, filename: str):
 
 extract = load_script("rajaraman_extract", "extract_rajaraman2024_raw_features.py")
 reproduce = load_script("rajaraman_reproduce", "reproduce_rajaraman2024.py")
+sys.path.insert(0, str(ROOT / "analysis" / "response_features"))
+clip_analysis = load_script(
+    "rajaraman_clip_analysis", "analyze_rajaraman2024_clip_associations.py"
+)
 
 
 def synthetic_metadata() -> pd.DataFrame:
@@ -114,3 +119,17 @@ def test_raw_feature_loader_averages_two_clips_per_patient(tmp_path):
     np.testing.assert_allclose(patients.dfa_intercept_beta_pre_awake, -0.2)
     np.testing.assert_allclose(patients.r0_raw, -2.361 * -0.2 - 0.051 * 5.0)
     np.testing.assert_allclose(patients.r1_raw, 4.765 * 6.0 - 7.786 * -0.2)
+
+
+def test_clip_auc_and_holm_adjustment():
+    table = pd.DataFrame(
+        {
+            "patient_id": [0, 0, 1, 1, 2, 2, 3, 3],
+            "label": [0, 0, 0, 0, 1, 1, 1, 1],
+            "value": [0.0, 0.1, 0.2, 0.3, 0.7, 0.8, 0.9, 1.0],
+        }
+    )
+    assert clip_analysis.clip_auc(table) == 1.0
+    np.testing.assert_allclose(
+        clip_analysis.holm_adjust([0.01, 0.04, 0.03]), [0.03, 0.06, 0.06]
+    )
