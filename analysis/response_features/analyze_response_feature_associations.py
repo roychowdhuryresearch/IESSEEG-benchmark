@@ -18,6 +18,7 @@ import pandas as pd
 from scipy.stats import rankdata
 
 from reproduce_rajaraman2024 import normalize_recording_id, response_value
+from rajaraman2024_contract import PLI_CONNECTIVITY_POLICY, PLI_EPOCH_POLICY
 
 
 HERE = Path(__file__).resolve().parent
@@ -113,10 +114,20 @@ def load_single_clip_quantities(
         if not path.is_file():
             raise FileNotFoundError(path)
         payload = json.loads(path.read_text(encoding="utf-8"))
+        if pre_awake and payload.get("pli_epoch_policy") != PLI_EPOCH_POLICY:
+            raise RuntimeError(
+                f"{path.name} contains PLI from an obsolete epoch policy; "
+                "rerun extract_rajaraman2024_raw_features.py --features pli"
+            )
+        if pre_awake and payload.get("pli_connectivity_policy") != PLI_CONNECTIVITY_POLICY:
+            raise RuntimeError(
+                f"{path.name} contains PLI from an obsolete connectivity policy; "
+                "rerun extract_rajaraman2024_raw_features.py --features pli"
+            )
         common = {"patient_id": int(row.patient_id), "label": int(row.label)}
         if pre_awake:
             dfa = float(payload["beta_dfa_intercept_mean"])
-            connectivity = float(payload["connectivity_percent_retained_pli"])
+            connectivity = float(payload["connectivity_percent_raw_pli"])
             rows["pre_awake_dfa_intercept_beta"].append({**common, "value": dfa})
             rows["pre_awake_connectivity_percent"].append(
                 {**common, "value": connectivity}

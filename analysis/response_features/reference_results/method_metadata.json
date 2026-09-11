@@ -16,6 +16,9 @@
   "limitations": [
     "clinician-marked sleep artifacts used by the source study are unavailable",
     "SciPy uses the nearest odd-tap FIR least-squares design for MATLAB compatibility",
-    "the source PLI wording was implemented primarily as retained significant PLI and secondarily as binary significance frequency"
-  ]
+    "PLI uses non-overlapping eight-second epochs within contiguous clean runs",
+    "C0 is the fraction of electrode pairs whose across-epoch mean raw PLI exceeds 0.20; surrogate-thresholded variants are retained only as diagnostics"
+  ],
+  "pli_epoch_policy": "nonoverlapping-8s-within-contiguous-clean-runs-v1",
+  "pli_connectivity_policy": "mean-raw-epoch-pli-then-pair-threshold-0.20-v1"
 }

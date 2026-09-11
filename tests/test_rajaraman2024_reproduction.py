@@ -15,6 +15,7 @@ import pandas as pd
 
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "analysis" / "response_features"))
 
 
 def load_script(name: str, filename: str):
@@ -28,7 +29,6 @@ def load_script(name: str, filename: str):
 
 extract = load_script("rajaraman_extract", "extract_rajaraman2024_raw_features.py")
 reproduce = load_script("rajaraman_reproduce", "reproduce_rajaraman2024.py")
-sys.path.insert(0, str(ROOT / "analysis" / "response_features"))
 clip_analysis = load_script(
     "response_feature_analysis", "analyze_response_feature_associations.py"
 )
@@ -72,6 +72,29 @@ def test_matlab_hist_entropy_handles_constant_and_balanced_signals():
     np.testing.assert_allclose(observed, [0.0, 1.0])
 
 
+def test_contiguous_clean_epochs_never_join_across_artifact_gaps():
+    fs = 2
+    seconds = 14
+    data = np.arange(seconds * fs, dtype=float)[None, :]
+    clean = np.array(
+        [True, True, True, True, False, True, True, True, True, True, True, True, False, False]
+    )
+
+    epochs = extract.contiguous_clean_epochs(data, clean, fs, epoch_seconds=4)
+
+    assert epochs.shape == (2, 1, 4 * fs)
+    np.testing.assert_array_equal(epochs[0, 0], data[0, 0 * fs : 4 * fs])
+    np.testing.assert_array_equal(epochs[1, 0], data[0, 5 * fs : 9 * fs])
+    assert data[0, 4 * fs] not in epochs
+
+
+def test_contiguous_clean_epochs_returns_empty_when_no_run_is_long_enough():
+    data = np.arange(20, dtype=float)[None, :]
+    clean = np.array([True, True, False, True, True])
+    epochs = extract.contiguous_clean_epochs(data, clean, fs=4, epoch_seconds=3)
+    assert epochs.shape == (0, 1, 12)
+
+
 def test_fast_fluctuation_function_matches_direct_linear_detrending():
     rng = np.random.default_rng(7)
     signal = rng.normal(size=100)
@@ -109,8 +132,11 @@ def test_raw_feature_loader_averages_two_clips_per_patient(tmp_path):
         if row.pre_post_treatment_label == "POST" and row.sleep_awake_label == "SLEEP":
             payload["beta_entropy_mean"] = 6.0
         if row.pre_post_treatment_label == "PRE":
+            payload["connectivity_percent_raw_pli"] = 4.0
             payload["connectivity_percent_retained_pli"] = 5.0
             payload["connectivity_percent_significance_frequency"] = 7.0
+            payload["pli_epoch_policy"] = extract.PLI_EPOCH_POLICY
+            payload["pli_connectivity_policy"] = extract.PLI_CONNECTIVITY_POLICY
         (feature_dir / f"{row.short_recording_id}.json").write_text(
             __import__("json").dumps(payload), encoding="utf-8"
         )
@@ -119,7 +145,7 @@ def test_raw_feature_loader_averages_two_clips_per_patient(tmp_path):
     assert len(patients) == 50
     assert patients.label.value_counts().to_dict() == {1: 28, 0: 22}
     np.testing.assert_allclose(patients.dfa_intercept_beta_pre_awake, -0.2)
-    np.testing.assert_allclose(patients.r0_raw, -2.361 * -0.2 - 0.051 * 5.0)
+    np.testing.assert_allclose(patients.r0_raw, -2.361 * -0.2 - 0.051 * 4.0)
     np.testing.assert_allclose(patients.r1_raw, 4.765 * 6.0 - 7.786 * -0.2)
 
 

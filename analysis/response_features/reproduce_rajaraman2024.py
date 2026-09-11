@@ -25,6 +25,8 @@ from scipy.stats import mannwhitneyu
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
 
+from rajaraman2024_contract import PLI_CONNECTIVITY_POLICY, PLI_EPOCH_POLICY
+
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
@@ -187,11 +189,30 @@ def load_raw_patient_features(features_dir: Path, metadata_csv: Path) -> pd.Data
                 [
                     "connectivity_percent_retained_pli",
                     "connectivity_percent_significance_frequency",
+                    "connectivity_percent_raw_pli",
                 ]
             )
         missing = [name for name in required if name not in payload]
         if missing:
             raise RuntimeError(f"{path.name} is incomplete: {missing}")
+        if (
+            row.pre_post_treatment_label == "PRE"
+            and row.sleep_awake_label == "AWAKE"
+            and payload.get("pli_epoch_policy") != PLI_EPOCH_POLICY
+        ):
+            raise RuntimeError(
+                f"{path.name} contains PLI from an obsolete epoch policy; "
+                "rerun extract_rajaraman2024_raw_features.py --features pli"
+            )
+        if (
+            row.pre_post_treatment_label == "PRE"
+            and row.sleep_awake_label == "AWAKE"
+            and payload.get("pli_connectivity_policy") != PLI_CONNECTIVITY_POLICY
+        ):
+            raise RuntimeError(
+                f"{path.name} contains PLI from an obsolete connectivity policy; "
+                "rerun extract_rajaraman2024_raw_features.py --features pli"
+            )
         rows.append(
             {
                 "patient_id": int(row.patient_id),
@@ -204,6 +225,9 @@ def load_raw_patient_features(features_dir: Path, metadata_csv: Path) -> pd.Data
                 "entropy_beta": payload.get("beta_entropy_mean", np.nan),
                 "connectivity_percent_retained_pli": payload.get(
                     "connectivity_percent_retained_pli", np.nan
+                ),
+                "connectivity_percent_raw_pli": payload.get(
+                    "connectivity_percent_raw_pli", np.nan
                 ),
                 "connectivity_percent_significance_frequency": payload.get(
                     "connectivity_percent_significance_frequency", np.nan
@@ -236,7 +260,7 @@ def load_raw_patient_features(features_dir: Path, metadata_csv: Path) -> pd.Data
         "connectivity_percent_pre_awake": (
             "PRE",
             "AWAKE",
-            "connectivity_percent_retained_pli",
+            "connectivity_percent_raw_pli",
         ),
         "connectivity_frequency_sensitivity_pre_awake": (
             "PRE",
@@ -624,7 +648,8 @@ def main() -> None:
             [
                 "clinician-marked sleep artifacts used by the source study are unavailable",
                 "SciPy uses the nearest odd-tap FIR least-squares design for MATLAB compatibility",
-                "the source PLI wording was implemented primarily as retained significant PLI and secondarily as binary significance frequency",
+                "PLI uses non-overlapping eight-second epochs within contiguous clean runs",
+                "C0 is the fraction of electrode pairs whose across-epoch mean raw PLI exceeds 0.20; surrogate-thresholded variants are retained only as diagnostics",
             ]
             if args.source == "raw"
             else [
@@ -633,6 +658,9 @@ def main() -> None:
             ]
         ),
     }
+    if args.source == "raw":
+        metadata["pli_epoch_policy"] = PLI_EPOCH_POLICY
+        metadata["pli_connectivity_policy"] = PLI_CONNECTIVITY_POLICY
     (args.output_dir / "method_metadata.json").write_text(
         json.dumps(metadata, indent=2) + "\n", encoding="utf-8"
     )

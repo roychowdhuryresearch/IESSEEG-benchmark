@@ -46,6 +46,13 @@ The final script averages the two matching clips for each patient and writes
 the distribution and score comparisons. The reviewed, de-identified aggregate
 tables from the completed run are in `reference_results/`.
 
+For PRE connectivity, clean EEG is divided into non-overlapping eight-second
+epochs without joining samples across artifact gaps. Raw delta-band PLI is
+averaged across epochs for each of the 171 electrode pairs. The source
+clip-level quantity `C0` is the percentage of pair means above 0.20. The
+surrogate-thresholded outputs are retained only as diagnostics and are not used
+in the published `R0` score.
+
 To test the source quantities before averaging each patient's two clips:
 
 ```bash

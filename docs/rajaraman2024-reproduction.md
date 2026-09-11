@@ -36,12 +36,14 @@ for least-squares FIR design, so the nearest odd-tap design is used where MATLAB
 accepts an even number. The source study also removed clinician-marked sleep
 artifacts; those marks are not available here.
 
-The PLI procedure is less completely specified. The primary implementation
-retains an observed epoch-level PLI only when it exceeds the 95th percentile of
-100 Fourier-phase-randomized surrogates, averages the resulting matrices across
-clean eight-second epochs, and reports the percentage of channel pairs above
-0.20. A declared sensitivity version records a significant edge as one before
-the epoch average. Both were fixed before comparing the full-cohort results.
+PLI is computed only within uninterrupted clean EEG. Each continuous clean run
+is divided into non-overlapping eight-second epochs; samples on opposite sides
+of an artifact are never joined into a new epoch. For each electrode pair, the
+raw delta-band PLI is averaged across epochs. The clip-level connectivity
+quantity used in the source baseline score, \(C_0\), is the percentage of the
+171 electrode pairs whose mean PLI exceeds 0.20. We also compute two
+surrogate-thresholded variants to audit the significance procedure inherited
+from Smith et al. (2021), but neither diagnostic is substituted for \(C_0\).
 
 ## Results
 
@@ -54,7 +56,7 @@ numerically identical estimands.
 | Quantity | Local responders | Local non-responders | Local P | Published responders | Published non-responders | Published P |
 |---|---:|---:|---:|---:|---:|---:|
 | PRE awake beta DFA intercept | -0.208 (-0.417, 0.075) | -0.045 (-0.131, 0.139) | 0.0279 | -0.20 (-0.41, 0.09) | -0.05 (-0.14, 0.15) | 0.046 |
-| PRE awake connectivity, primary PLI reading (%) | 0.00 (0.00, 0.00) | 0.00 (0.00, 1.17) | 0.102 | 6.7 (1.6, 13.5) | 12.7 (4.4, 23.7) | 0.039 |
+| PRE awake connectivity, electrode-pair mean PLI > 0.20 (%) | 5.85 (0.51, 12.72) | 12.43 (3.07, 23.76) | 0.0591 | 6.7 (1.6, 13.5) | 12.7 (4.4, 23.7) | 0.039 |
 | POST sleep beta entropy | 5.973 (5.789, 6.111) | 5.375 (5.084, 5.678) | 2.32e-5 | 8.06 (7.79, 8.19) | 7.50 (7.15, 7.81) | 0.006 |
 | POST awake beta DFA intercept | -0.442 (-0.725, -0.279) | -0.087 (-0.283, 0.014) | 1.44e-4 | -0.43 (-0.70, -0.26) | -0.11 (-0.29, 0.04) | 0.006 |
 
@@ -70,7 +72,7 @@ R_1=4.765\,H_1-7.786\,\mathrm{DFAI}_1.
 
 | Score | Local group separation | Local AUROC | Published AUROC | Local fixed-feature leave-one-patient-out AUROC | Published n-1 AUROC |
 |---|---:|---:|---:|---:|---:|
-| PRE score, R0 | 0.484 vs -0.213; P = 0.00720 | 0.724 | 0.75 (0.61-0.89) | 0.721 | 0.69 |
+| PRE score, R0 | 0.174 vs -0.841; P = 0.00307 | 0.747 | 0.75 (0.61-0.89) | 0.706 | 0.69 |
 | POST score, R1 | 31.777 vs 26.936; P = 3.56e-7 | 0.924 | 0.93 (0.85-1.00) | 0.917 | 0.91 |
 
 The local leave-one-patient-out analysis refits a logistic regression using the
@@ -80,10 +82,12 @@ iteration, so this is a fixed-feature reproduction of its validation step.
 
 ## What reproduced
 
-The strongest numerical check is DFA. PRE and POST group medians and quartiles
-agree with the paper to approximately one or two hundredths. This would be very
-unlikely if the recording-to-patient mapping, response endpoint, signal unit,
-montage, or DFA definition were materially wrong.
+The PRE and POST DFA group medians and quartiles agree with the paper to
+approximately one or two hundredths. The PLI distribution also reproduces
+closely: local responder and non-responder medians are 5.85% and 12.43%, versus
+6.7% and 12.7% in the paper. Together, these checks support the
+recording-to-patient mapping, response endpoint, signal unit, montage, and
+feature definitions used here.
 
 The direction and magnitude of the entropy group difference also reproduced:
 the local responder-minus-non-responder median difference is 0.598 bits, versus
@@ -94,21 +98,19 @@ resolved from the paper alone. A constant offset shifts R1 but does not change
 its patient ranking or AUROC.
 
 Most importantly, the source scores recover nearly the same discrimination.
-R0 differs from the reported apparent AUROC by 0.026, while R1 differs by 0.006.
+R0 differs from the reported apparent AUROC by 0.003, while R1 differs by 0.006.
 The fixed-feature leave-one-patient-out results differ from the reported n-1
-AUROCs by 0.031 and 0.007, respectively.
+AUROCs by 0.016 and 0.007, respectively.
 
-## What did not reproduce exactly
+## Remaining differences
 
-The published PLI distribution did not reproduce. Under the primary reading,
-most patient values are zero. Under the binary-significance sensitivity
-reading, responders have a median of 1.75% and non-responders 3.95% (P = 0.228):
-the direction agrees with the article, but the magnitude and P-value do not.
-The target article cites the prior method rather than providing executable PLI
-code. An earlier local Python cache contained a different quantity: mean raw
-PLI across channel pairs without eight-second epochs, surrogate testing, or the
-0.20 network threshold. The published PLI values therefore cannot be treated
-as exactly reproduced.
+The local PLI distributions closely match the reported distributions, but the
+local unadjusted Mann-Whitney P-value is 0.059 rather than the reported 0.039.
+The source P-value came from a seven-feature sequential procedure with
+Benjamini-Hochberg correction, so these are not identical tests. The lower
+quartiles also differ modestly (0.51% versus 1.6% for responders and 3.07%
+versus 4.4% for non-responders). The source paper does not provide executable
+PLI code, which prevents a line-by-line implementation comparison.
 
 The local automated artifact detector excludes a median 12.6% of extracted
 awake data, compared with 8.9% in the article. For POST sleep, local exclusion
@@ -119,10 +121,11 @@ filter implementation can account for this remaining discrepancy.
 ## Scientific conclusion
 
 This reproduction supports the statement that both PRE and POST EEG contain
-information associated with the sustained-response endpoint in this cohort.
-For PRE, the prespecified DFA feature differs between response groups and the
-published two-feature score reaches AUROC 0.724. For POST, entropy and DFA each
-differ strongly between groups and the published score reaches AUROC 0.924.
+variation associated with the sustained-response endpoint in this cohort. For
+PRE, the published two-feature score reaches AUROC 0.747, with responder and
+non-responder score distributions differing at P = 0.00307. For POST, entropy
+and DFA each differ strongly between groups and the published score reaches
+AUROC 0.924.
 
 This result does **not** by itself establish a generalizable prognostic model.
 It uses the same cohort in which the equations were derived, and POST EEG is

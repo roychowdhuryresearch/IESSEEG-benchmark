@@ -42,6 +42,8 @@ import numpy as np
 import pandas as pd
 from scipy.signal import butter, filtfilt, hilbert, lfilter, firls, resample_poly
 
+from rajaraman2024_contract import PLI_CONNECTIVITY_POLICY, PLI_EPOCH_POLICY
+
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
@@ -174,6 +176,40 @@ def concatenate_clean_seconds(data: np.ndarray, clean_seconds: np.ndarray, fs: i
     return blocks[:, clean_seconds].reshape(data.shape[0], -1)
 
 
+def contiguous_clean_epochs(
+    data: np.ndarray,
+    clean_seconds: np.ndarray,
+    fs: int,
+    epoch_seconds: int = 8,
+) -> np.ndarray:
+    """Cut complete epochs without joining EEG across artifact gaps.
+
+    Artifact detection marks whole one-second blocks.  Each run of consecutive
+    clean blocks is tiled independently, so two samples that were separated by
+    an excluded block can never become neighbors in an epoch.
+    """
+    clean_seconds = np.asarray(clean_seconds, dtype=bool)
+    epoch_samples = epoch_seconds * fs
+    padded = np.r_[False, clean_seconds, False]
+    run_starts = np.flatnonzero(~padded[:-1] & padded[1:])
+    run_stops = np.flatnonzero(padded[:-1] & ~padded[1:])
+
+    epochs = []
+    for start_second, stop_second in zip(run_starts, run_stops):
+        n_epochs = (stop_second - start_second) // epoch_seconds
+        if n_epochs == 0:
+            continue
+        start_sample = start_second * fs
+        stop_sample = start_sample + n_epochs * epoch_samples
+        run = data[:, start_sample:stop_sample]
+        run_epochs = run.reshape(data.shape[0], n_epochs, epoch_samples)
+        epochs.append(np.moveaxis(run_epochs, 1, 0))
+
+    if not epochs:
+        return np.empty((0, data.shape[0], epoch_samples), dtype=data.dtype)
+    return np.concatenate(epochs, axis=0)
+
+
 def matlab_hist_entropy(signal: np.ndarray, bins: int = 350) -> np.ndarray:
     """Shannon entropy using MATLAB ``hist(x, bins)``-style bin centers."""
     values = np.empty(signal.shape[0], dtype=float)
@@ -262,25 +298,30 @@ def analytic_phase_torch(signal, torch):
 
 
 def gpu_pli_connectivity(
-    clean_delta: np.ndarray,
+    clean_epochs: np.ndarray,
     fs: int,
     n_surrogates: int,
     seed: int,
 ) -> dict[str, float | int]:
-    """Compute both published-wording interpretations of PLI connectivity."""
+    """Compute the source clip metric and two surrogate-threshold diagnostics."""
     import torch
 
     if not torch.cuda.is_available():
         raise RuntimeError("PLI extraction requires CUDA; refusing CPU fallback")
     device = torch.device("cuda")
     epoch_samples = 8 * fs
-    n_epochs = clean_delta.shape[1] // epoch_samples
+    if clean_epochs.ndim != 3 or clean_epochs.shape[1:] != (19, epoch_samples):
+        raise ValueError(
+            "Expected clean PLI epochs shaped "
+            f"(n_epochs, 19, {epoch_samples}), got {clean_epochs.shape}"
+        )
+    n_epochs = clean_epochs.shape[0]
     if n_epochs < 1:
         raise ValueError("No complete clean 8-second epoch for PLI")
-    epochs = clean_delta[:, : n_epochs * epoch_samples].reshape(19, n_epochs, epoch_samples)
-    epochs = np.moveaxis(epochs, 1, 0).astype(np.float32, copy=False)
+    epochs = clean_epochs.astype(np.float32, copy=False)
     generator = torch.Generator(device=device)
     generator.manual_seed(seed)
+    raw_sum = torch.zeros((19, 19), device=device)
     retained_sum = torch.zeros((19, 19), device=device)
     significant_sum = torch.zeros((19, 19), device=device)
 
@@ -288,6 +329,7 @@ def gpu_pli_connectivity(
         epoch = torch.as_tensor(epoch_np, device=device)
         observed_phase = analytic_phase_torch(epoch, torch)[None, ...]
         observed = pli_matrix_from_phase_torch(observed_phase, torch)[0]
+        raw_sum += observed
 
         spectrum = torch.fft.rfft(epoch, dim=-1)
         magnitude = torch.abs(spectrum)[None, ...]
@@ -305,12 +347,18 @@ def gpu_pli_connectivity(
         significant_sum += significant
 
     pair = torch.triu_indices(19, 19, offset=1, device=device)
+    raw_network = raw_sum / n_epochs
     retained_network = retained_sum / n_epochs
     frequency_network = significant_sum / n_epochs
     result = {
         "pli_n_clean_8s_epochs": int(n_epochs),
-        # Primary reading of Smith et al.: non-significant PLI values become
-        # zero, then the resulting matrices are averaged across epochs.
+        # Rajaraman et al.'s C0: average epoch PLI for every electrode pair,
+        # then report the percentage of pair means above 0.20.  This definition
+        # reproduces the article's reported group distribution.
+        "connectivity_percent_raw_pli": float(
+            100.0 * (raw_network[pair[0], pair[1]] > 0.20).float().mean().item()
+        ),
+        # Smith et al.'s surrogate-threshold wording, retained as a diagnostic.
         "connectivity_percent_retained_pli": float(
             100.0 * (retained_network[pair[0], pair[1]] > 0.20).float().mean().item()
         ),
@@ -373,9 +421,11 @@ def extract_one(row, edf_dir: Path, feature_set: str, n_surrogates: int, seed: i
     if feature_set in {"pli", "all"} and needs_pli:
         car = scalp_uv - scalp_uv.mean(axis=0, keepdims=True)
         delta = filtfilt(matlab_firls_approximation("delta", fs), [1.0], car, axis=1)
-        clean_delta = concatenate_clean_seconds(delta, clean_seconds, fs)
-        output.update(gpu_pli_connectivity(clean_delta, fs, n_surrogates, seed))
+        clean_epochs = contiguous_clean_epochs(delta, clean_seconds, fs, epoch_seconds=8)
+        output.update(gpu_pli_connectivity(clean_epochs, fs, n_surrogates, seed))
         output["pli_surrogates_per_epoch"] = int(n_surrogates)
+        output["pli_epoch_policy"] = PLI_EPOCH_POLICY
+        output["pli_connectivity_policy"] = PLI_CONNECTIVITY_POLICY
     return output
 
 
@@ -443,7 +493,11 @@ def main() -> None:
         if path.exists():
             existing = json.loads(path.read_text(encoding="utf-8"))
         beta_done = "beta_dfa_intercept_mean" in existing or "beta_entropy_mean" in existing
-        pli_done = "connectivity_percent_retained_pli" in existing
+        pli_done = (
+            "connectivity_percent_raw_pli" in existing
+            and existing.get("pli_epoch_policy") == PLI_EPOCH_POLICY
+            and existing.get("pli_connectivity_policy") == PLI_CONNECTIVITY_POLICY
+        )
         if (args.features == "beta" and beta_done) or (args.features == "pli" and pli_done) or (
             args.features == "all" and beta_done and (pli_done or row.pre_post_treatment_label != "PRE" or row.sleep_awake_label != "AWAKE")
         ):
