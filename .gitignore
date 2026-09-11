@@ -195,3 +195,6 @@ pretrained_weights/
 
 # Patient-derived analysis outputs
 analysis/based/results/
+
+# Governed row-level labels and patient-derived response outputs stay local.
+local_results/rajaraman2024/

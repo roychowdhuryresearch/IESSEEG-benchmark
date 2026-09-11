@@ -169,6 +169,10 @@ Adding a baseline means adding a directory under `baselines/` with a
 `scripts/lib/common.sh`, then registering it in `scripts/run_benchmark.sh`
 and `iesseeg/evaluation/aggregate.py`.
 
+The independent reproduction of the published Rajaraman et al. response
+features is documented in
+[`analysis/response_features/`](analysis/response_features/README.md).
+
 ## Citation
 
 ```bibtex

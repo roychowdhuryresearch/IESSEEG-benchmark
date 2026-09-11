@@ -1,0 +1,4 @@
+group,n_clips,local_excluded_percent_median,local_excluded_percent_q1,local_excluded_percent_q3,published_excluded_percent_median,published_excluded_percent_q1,published_excluded_percent_q3
+all_extracted_awake,200,12.642836864331597,7.485110476519818,17.280941949616647,8.9,4.3,12.3
+post_sleep_responders,56,0.6369439793989351,0.1275392386132862,1.1800284083048174,0.7,0.1,1.1
+post_sleep_nonresponders,44,2.785095445220609,1.2545055827468676,6.012338187702265,1.7,0.7,4.4

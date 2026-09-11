@@ -1,0 +1,21 @@
+{
+  "source_article": "Rajaraman et al., Clinical Neurophysiology, 2024",
+  "doi": "10.1016/j.clinph.2024.03.035",
+  "stage": "independent raw-EDF reproduction",
+  "claim": "method reproduction with disclosed approximations; not a bitwise source-code reproduction",
+  "patient_unit": "mean of two clips for each condition and vigilance state",
+  "n_patients": 50,
+  "response_counts": {
+    "responder": 28,
+    "nonresponder": 22
+  },
+  "published_equations": {
+    "R0": "-2.361 * pre_awake_beta_DFA_intercept - 0.051 * pre_awake_connectivity",
+    "R1": "4.765 * post_sleep_beta_Shannon_entropy - 7.786 * post_awake_beta_DFA_intercept"
+  },
+  "limitations": [
+    "clinician-marked sleep artifacts used by the source study are unavailable",
+    "SciPy uses the nearest odd-tap FIR least-squares design for MATLAB compatibility",
+    "the source PLI wording was implemented primarily as retained significant PLI and secondarily as binary significance frequency"
+  ]
+}

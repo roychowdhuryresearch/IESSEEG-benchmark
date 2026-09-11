@@ -1,0 +1,4 @@
+score,n_patients,local_published_formula_auroc,published_formula_auroc,published_formula_auroc_ci_low,published_formula_auroc_ci_high,local_fixed_feature_loocv_auroc,published_loocv_auroc
+r0_raw,50,0.724025974025974,0.75,0.61,0.89,0.7207792207792207,0.69
+r1_raw,50,0.9237012987012987,0.93,0.85,1.0,0.9172077922077921,0.91
+r0_frequency_sensitivity,50,0.7207792207792207,,,,0.702922077922078,
