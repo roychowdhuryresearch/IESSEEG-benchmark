@@ -116,9 +116,12 @@ python analysis/response_features/analyze_paper_derived_response_metrics.py \
   --raw-features-dir local_results/rajaraman2024/raw_features
 ```
 
-The catalog names the original target and construction for every row. It uses
-separate, labeled Holm families for the 24 individual-feature tests and the 16
-paper-derived tests within each response endpoint.
+The catalog names the original target and construction for every row and marks
+each row explicitly as `clip-based` or `patient-based`. The executed notebook
+shows four complete 20-row tables (endpoint by calculation level), with
+individual and combined metrics together. The catalog uses separate, labeled
+Holm families for the 24 individual-feature tests and the 16 paper-derived
+tests within each response endpoint.
 
 `P0` and `P1` are not EEG-only quantities because both include the published
 treatment-duration category. The paper did not define a combined PRE-plus-POST

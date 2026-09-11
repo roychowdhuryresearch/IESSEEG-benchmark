@@ -240,3 +240,7 @@ def test_full_qeeg_grid_contains_every_cell_and_both_aggregations(tmp_path):
         "24 individual-feature tests within endpoint",
         "16 paper-derived tests within endpoint",
     }
+    assert catalog.groupby("calculation_level").size().to_dict() == {
+        "clip-based": 20,
+        "patient-based": 20,
+    }

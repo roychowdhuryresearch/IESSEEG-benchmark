@@ -379,6 +379,9 @@ def build_complete_catalog(
     base["matches_source_patient_construction"] = (
         base.source_selected_cell & base.analysis_family.eq("patient_average")
     )
+    base["calculation_level"] = np.where(
+        base.analysis_family.eq("single_clip"), "clip-based", "patient-based"
+    )
     base["adjustment_family"] = "24 individual-feature tests within endpoint"
 
     combined = derived.rename(
@@ -389,6 +392,11 @@ def build_complete_catalog(
         }
     ).copy()
     combined["source_selected_or_defined"] = True
+    combined["calculation_level"] = np.where(
+        combined.matches_source_patient_construction,
+        "patient-based",
+        "clip-based",
+    )
     combined["adjustment_family"] = "16 paper-derived tests within endpoint"
 
     columns = [
@@ -397,6 +405,7 @@ def build_complete_catalog(
         "source_target",
         "input",
         "quantity",
+        "calculation_level",
         "aggregation",
         "source_selected_or_defined",
         "matches_source_patient_construction",
@@ -418,7 +427,14 @@ def build_complete_catalog(
     ]
     catalog = pd.concat([base[columns], combined[columns]], ignore_index=True)
     return catalog.sort_values(
-        ["endpoint_tested_here", "metric_category", "input", "quantity", "aggregation"],
+        [
+            "endpoint_tested_here",
+            "calculation_level",
+            "metric_category",
+            "input",
+            "quantity",
+            "aggregation",
+        ],
         kind="stable",
     ).reset_index(drop=True)
 
