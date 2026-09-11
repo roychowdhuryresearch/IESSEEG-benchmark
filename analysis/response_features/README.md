@@ -49,18 +49,21 @@ tables from the completed run are in `reference_results/`.
 To test the source quantities before averaging each patient's two clips:
 
 ```bash
-python analysis/response_features/analyze_rajaraman2024_clip_associations.py \
+python analysis/response_features/analyze_response_feature_associations.py \
   --metadata-csv /path/to/local_clip_metadata.csv \
   --raw-features-dir local_results/rajaraman2024/raw_features
 ```
 
-This analysis computes an AUROC over the 100 individual clips in each relevant
-condition/state cell. Its significance test shuffles labels across the 50
-patients while always keeping the two clips from one patient together. The
-committed table reports the resulting patient-clustered permutation P-values
-and Holm correction across the five inspected quantities. A complete POST
-score is not reported per clip because it combines separate awake and sleep
-clips.
+This analysis evaluates both immediate and sustained response. It first
+computes an AUROC over the 100 individual clips in each relevant
+condition/state cell. It then combines one POST awake clip and one POST sleep
+clip in all four possible within-patient pairings, and shows the source
+patient-averaged scores for reference. Its significance test shuffles labels
+across the 50 patients while keeping every value from one patient together.
+The committed table reports patient-clustered permutation P-values and Holm
+correction across the eight inspected quantities within each endpoint.
+The executed, reader-oriented version is
+[`notebooks/clip_and_state_response_associations.ipynb`](notebooks/clip_and_state_response_associations.ipynb).
 
 See [`../../docs/rajaraman2024-reproduction.md`](../../docs/rajaraman2024-reproduction.md)
 for the method correspondence, numerical findings, and limitations.

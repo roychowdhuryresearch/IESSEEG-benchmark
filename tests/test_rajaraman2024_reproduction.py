@@ -7,8 +7,8 @@ restricted response data, a model checkpoint, or a GPU.
 from __future__ import annotations
 
 import importlib.util
-from pathlib import Path
 import sys
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -30,7 +30,7 @@ extract = load_script("rajaraman_extract", "extract_rajaraman2024_raw_features.p
 reproduce = load_script("rajaraman_reproduce", "reproduce_rajaraman2024.py")
 sys.path.insert(0, str(ROOT / "analysis" / "response_features"))
 clip_analysis = load_script(
-    "rajaraman_clip_analysis", "analyze_rajaraman2024_clip_associations.py"
+    "response_feature_analysis", "analyze_response_feature_associations.py"
 )
 
 
@@ -38,7 +38,8 @@ def synthetic_metadata() -> pd.DataFrame:
     rows = []
     recording = 0
     for patient in range(50):
-        response = "Responder" if patient < 28 else "Non-responder"
+        sustained = "Responder" if patient < 28 else "Non-responder"
+        immediate = "Responder" if patient < 32 else "Non-responder"
         for condition in ("PRE", "POST"):
             for state in ("AWAKE", "SLEEP"):
                 for _ in range(2):
@@ -50,7 +51,8 @@ def synthetic_metadata() -> pd.DataFrame:
                             "case_control_label": "CASE",
                             "pre_post_treatment_label": condition,
                             "sleep_awake_label": state,
-                            "meaningful_responder": response,
+                            "immediate_responder": immediate,
+                            "meaningful_responder": sustained,
                             "LeadtimeUKISS": patient % 3,
                         }
                     )
@@ -129,7 +131,7 @@ def test_clip_auc_and_holm_adjustment():
             "value": [0.0, 0.1, 0.2, 0.3, 0.7, 0.8, 0.9, 1.0],
         }
     )
-    assert clip_analysis.clip_auc(table) == 1.0
+    assert clip_analysis.response_auc(table) == 1.0
     np.testing.assert_allclose(
         clip_analysis.holm_adjust([0.01, 0.04, 0.03]), [0.03, 0.06, 0.06]
     )
